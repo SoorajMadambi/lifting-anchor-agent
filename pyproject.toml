@@ -1,0 +1,21 @@
+[project]
+name = "liftagent"
+version = "0.1.0"
+description = "Proof-of-concept lifting-anchor placement agent for precast wall panel WC001"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+ifc = ["ifcopenshell>=0.8"]
+llm = ["anthropic>=0.40"]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,45 @@
+{
+  "element_id": "WC001",
+  "type": "precast_rc_wall_panel",
+  "description": "Internal load-bearing stability wall (HybriDfMA family).",
+  "note_on_sources": "Geometry reaches you from two systems that DO NOT agree. Decide how your agent should behave.",
+  "sources": {
+    "approval_design": {
+      "length_mm": 4700,
+      "height_mm": 3000,
+      "thickness_mm": 180,
+      "openings_mm": [
+        { "id": "door",   "x": 1150, "width": 1100, "sill": 0,   "height": 2100 },
+        { "id": "window", "x": 3050, "width": 1200, "sill": 950, "height": 1000 }
+      ]
+    },
+    "ifc_export": {
+      "length_mm": 4300,
+      "height_mm": 3000,
+      "thickness_mm": 180,
+      "openings_mm": []
+    }
+  },
+  "concrete": {
+    "class": "C32/40",
+    "density_kg_per_m3": 2400,
+    "first_lift_strength_mpa": 15,
+    "note": "first_lift_strength is the SPECIFIED stripping strength; in production it must be CONFIRMED by a measured cube / maturity at the stripping instant."
+  },
+  "reinforcement": {
+    "main_curtain": "H16@200",
+    "horizontal": "H8@200",
+    "edge_u_bars": "H8@200",
+    "opening_trimmers": "H12",
+    "cover_mm": 30,
+    "faces": 2,
+    "note": "Curtain steps down up the building; treat the section as having a mild one-sided mass bias."
+  },
+  "production": {
+    "cast_orientation": "flat",
+    "mould": "tilting_table_or_battery",
+    "turn_method": "UNCONFIRMED",
+    "storage": "A-frame stillage, anchor-up"
+  },
+  "handling_states_required": ["demould", "turn", "storage", "transport", "erection"]
+}

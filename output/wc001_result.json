@@ -1,0 +1,871 @@
+{
+  "element_id": "WC001",
+  "status": "HOLD",
+  "reason": "UNRESOLVED_GEOMETRY_CONFLICT",
+  "geometry_sources": [
+    {
+      "source_type": "APPROVAL_JSON",
+      "source_name": "approval_design",
+      "role": "AUTHORITATIVE_DESIGN",
+      "length_mm": 4700,
+      "height_mm": 3000,
+      "thickness_mm": 180,
+      "openings": [
+        {
+          "id": "door",
+          "x_mm": 1150,
+          "width_mm": 1100,
+          "sill_mm": 0,
+          "height_mm": 2100
+        },
+        {
+          "id": "window",
+          "x_mm": 3050,
+          "width_mm": 1200,
+          "sill_mm": 950,
+          "height_mm": 1000
+        }
+      ],
+      "extraction_status": "SUCCESS",
+      "provenance_note": "Appendix A approval design geometry (JSON, required input)."
+    },
+    {
+      "source_type": "IFC_EXPORT_JSON",
+      "source_name": "ifc_export",
+      "role": "EXPORT",
+      "length_mm": 4300,
+      "height_mm": 3000,
+      "thickness_mm": 180,
+      "openings": [],
+      "extraction_status": "SUCCESS",
+      "provenance_note": "Appendix A IFC/export summary field (JSON, required input; NOT independently re-parsed -- see 'ifc_geometry' for that)."
+    },
+    {
+      "source_type": "IFC_PARSED",
+      "source_name": "ifc_geometry",
+      "role": "DERIVED_REFERENCE",
+      "length_mm": 4699.999999999997,
+      "height_mm": 3000.0,
+      "thickness_mm": 179.99999999999972,
+      "openings": [],
+      "extraction_status": "PARTIAL",
+      "provenance_note": "Bounding box (length/height/thickness) extracted from the real WC001.ifc geometry via ifcopenshell. Opening voids were NOT extracted: this file's proxy geometry is a faceted BREP with openings cut via tessellated boundary facets rather than a proper inner face loop, so opening count/position here is UNKNOWN, not confirmed-zero -- it is excluded from opening-count conflict comparisons (see ingest.py)."
+    }
+  ],
+  "selected_geometry": null,
+  "cog": {
+    "x_mm": 2344.5,
+    "y_mm": 1603.8,
+    "source": "approval_design",
+    "method": "net_area_centroid",
+    "note": "One-sided reinforcement curtain may introduce a qualitative mass bias (input note: 'curtain steps down up the building'); no quantified offset is provided, so no numerical correction was applied."
+  },
+  "cog_by_source": [
+    {
+      "source": "approval_design",
+      "x_mm": 2344.5,
+      "y_mm": 1603.8
+    },
+    {
+      "source": "ifc_export",
+      "x_mm": 2150.0,
+      "y_mm": 1500.0
+    },
+    {
+      "source": "ifc_geometry",
+      "x_mm": 2350.0,
+      "y_mm": 1500.0
+    }
+  ],
+  "self_weight": {
+    "value_kN": 44.88,
+    "method": "geometry_volume_x_density",
+    "source": "approval_design",
+    "reference_value_kN": 72.6,
+    "discrepancy_kN": -27.72,
+    "warning": "Computed self-weight (44.9 kN) does not reconcile with the brief's reference figure (72.6 kN); the reference value's provenance cannot be established from the supplied geometry+density, so it is NOT used as an authoritative input (see DESIGN_NOTE.md).",
+    "density_kg_per_m3": 2400,
+    "concrete_class": "C32/40"
+  },
+  "self_weight_by_source": [
+    {
+      "source": "approval_design",
+      "value_kN": 44.88
+    },
+    {
+      "source": "ifc_export",
+      "value_kN": 54.67
+    },
+    {
+      "source": "ifc_geometry",
+      "value_kN": 59.75
+    }
+  ],
+  "resolved_candidate": null,
+  "illustrative_candidate": {
+    "candidate_id": "candidate-ARL-42",
+    "anchor_type": "ARL-42",
+    "clutch": "RU-42",
+    "x1_mm": 967.4,
+    "x2_mm": 3721.6,
+    "anchors": [
+      {
+        "id": "A1",
+        "type": "ARL-42",
+        "clutch": "RU-42",
+        "x_mm": 967.4,
+        "y_mm": 0.0
+      },
+      {
+        "id": "A2",
+        "type": "ARL-42",
+        "clutch": "RU-42",
+        "x_mm": 3721.6,
+        "y_mm": 0.0
+      }
+    ],
+    "checks": [
+      {
+        "check_name": "min_wall_axial",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 180,
+        "capacity": 160,
+        "utilisation": null,
+        "governing_input": "",
+        "rule_reference": "brief 3.3 min wall (axial)",
+        "explanation": "panel thickness 180mm vs ARL-42 min axial wall 160mm",
+        "governing": false,
+        "handling_state": "",
+        "anchor_id": "",
+        "conditional_on": ""
+      },
+      {
+        "check_name": "edge_distance",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 967.38,
+        "capacity": 500,
+        "utilisation": null,
+        "governing_input": "",
+        "rule_reference": "brief 3.3 min edge distance",
+        "explanation": "edge distance 967mm vs ARL-42 min edge 500mm",
+        "governing": false,
+        "handling_state": "",
+        "anchor_id": "",
+        "conditional_on": ""
+      },
+      {
+        "check_name": "axis_spacing",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 2754.2,
+        "capacity": 1000,
+        "utilisation": null,
+        "governing_input": "",
+        "rule_reference": "brief 3.3 min axis spacing",
+        "explanation": "axis spacing 2754mm vs ARL-42 min axis 1000mm",
+        "governing": false,
+        "handling_state": "",
+        "anchor_id": "",
+        "conditional_on": ""
+      },
+      {
+        "check_name": "opening_void_clash",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": null,
+        "capacity": null,
+        "utilisation": null,
+        "governing_input": "",
+        "rule_reference": "brief 3.5 step 8",
+        "explanation": "no anchor position overlaps an opening reaching the top edge",
+        "governing": false,
+        "handling_state": "",
+        "anchor_id": "",
+        "conditional_on": ""
+      },
+      {
+        "check_name": "reaction_nonnegative",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 36.22,
+        "capacity": null,
+        "utilisation": null,
+        "governing_input": "",
+        "rule_reference": "brief 3.5 step 4 (plumb lift, CoG between the picks)",
+        "explanation": "DEMOULD A1: reaction 36.22kN (must be >=0 for a stable 2-point lift)",
+        "governing": false,
+        "handling_state": "DEMOULD",
+        "anchor_id": "A1",
+        "conditional_on": ""
+      },
+      {
+        "check_name": "axial_capacity",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 36.22,
+        "capacity": 60,
+        "utilisation": 0.604,
+        "governing_input": "",
+        "rule_reference": "brief 3.3 F <= N_zul",
+        "explanation": "DEMOULD: demand 36.2kN vs ARL-42@15MPa capacity 60.0kN [CONDITIONAL: conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed]",
+        "governing": true,
+        "handling_state": "DEMOULD",
+        "anchor_id": "A1",
+        "conditional_on": "conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed"
+      },
+      {
+        "check_name": "reaction_nonnegative",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 36.22,
+        "capacity": null,
+        "utilisation": null,
+        "governing_input": "",
+        "rule_reference": "brief 3.5 step 4 (plumb lift, CoG between the picks)",
+        "explanation": "DEMOULD A2: reaction 36.22kN (must be >=0 for a stable 2-point lift)",
+        "governing": false,
+        "handling_state": "DEMOULD",
+        "anchor_id": "A2",
+        "conditional_on": ""
+      },
+      {
+        "check_name": "axial_capacity",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 36.22,
+        "capacity": 60,
+        "utilisation": 0.604,
+        "governing_input": "",
+        "rule_reference": "brief 3.3 F <= N_zul",
+        "explanation": "DEMOULD: demand 36.2kN vs ARL-42@15MPa capacity 60.0kN [CONDITIONAL: conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed]",
+        "governing": false,
+        "handling_state": "DEMOULD",
+        "anchor_id": "A2",
+        "conditional_on": "conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed"
+      },
+      {
+        "check_name": "reaction_nonnegative",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 22.44,
+        "capacity": null,
+        "utilisation": null,
+        "governing_input": "",
+        "rule_reference": "brief 3.5 step 4 (plumb lift, CoG between the picks)",
+        "explanation": "STORAGE A1: reaction 22.44kN (must be >=0 for a stable 2-point lift)",
+        "governing": false,
+        "handling_state": "STORAGE",
+        "anchor_id": "A1",
+        "conditional_on": ""
+      },
+      {
+        "check_name": "axial_capacity",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 22.44,
+        "capacity": 60,
+        "utilisation": 0.374,
+        "governing_input": "",
+        "rule_reference": "brief 3.3 F <= N_zul",
+        "explanation": "STORAGE: demand 22.4kN vs ARL-42@15MPa capacity 60.0kN [CONDITIONAL: conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed]",
+        "governing": false,
+        "handling_state": "STORAGE",
+        "anchor_id": "A1",
+        "conditional_on": "conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed"
+      },
+      {
+        "check_name": "reaction_nonnegative",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 22.44,
+        "capacity": null,
+        "utilisation": null,
+        "governing_input": "",
+        "rule_reference": "brief 3.5 step 4 (plumb lift, CoG between the picks)",
+        "explanation": "STORAGE A2: reaction 22.44kN (must be >=0 for a stable 2-point lift)",
+        "governing": false,
+        "handling_state": "STORAGE",
+        "anchor_id": "A2",
+        "conditional_on": ""
+      },
+      {
+        "check_name": "axial_capacity",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 22.44,
+        "capacity": 60,
+        "utilisation": 0.374,
+        "governing_input": "",
+        "rule_reference": "brief 3.3 F <= N_zul",
+        "explanation": "STORAGE: demand 22.4kN vs ARL-42@15MPa capacity 60.0kN [CONDITIONAL: conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed]",
+        "governing": false,
+        "handling_state": "STORAGE",
+        "anchor_id": "A2",
+        "conditional_on": "conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed"
+      },
+      {
+        "check_name": "reaction_nonnegative",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 44.88,
+        "capacity": null,
+        "utilisation": null,
+        "governing_input": "",
+        "rule_reference": "brief 3.5 step 4 (plumb lift, CoG between the picks)",
+        "explanation": "ROAD_TRANSPORT A1: reaction 44.88kN (must be >=0 for a stable 2-point lift)",
+        "governing": false,
+        "handling_state": "ROAD_TRANSPORT",
+        "anchor_id": "A1",
+        "conditional_on": ""
+      },
+      {
+        "check_name": "axial_capacity",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 44.88,
+        "capacity": 80,
+        "utilisation": 0.561,
+        "governing_input": "",
+        "rule_reference": "brief 3.3 F <= N_zul",
+        "explanation": "ROAD_TRANSPORT: demand 44.9kN vs ARL-42@35MPa capacity 80.0kN [CONDITIONAL: conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed]",
+        "governing": false,
+        "handling_state": "ROAD_TRANSPORT",
+        "anchor_id": "A1",
+        "conditional_on": "conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed"
+      },
+      {
+        "check_name": "reaction_nonnegative",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 44.88,
+        "capacity": null,
+        "utilisation": null,
+        "governing_input": "",
+        "rule_reference": "brief 3.5 step 4 (plumb lift, CoG between the picks)",
+        "explanation": "ROAD_TRANSPORT A2: reaction 44.88kN (must be >=0 for a stable 2-point lift)",
+        "governing": false,
+        "handling_state": "ROAD_TRANSPORT",
+        "anchor_id": "A2",
+        "conditional_on": ""
+      },
+      {
+        "check_name": "axial_capacity",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 44.88,
+        "capacity": 80,
+        "utilisation": 0.561,
+        "governing_input": "",
+        "rule_reference": "brief 3.3 F <= N_zul",
+        "explanation": "ROAD_TRANSPORT: demand 44.9kN vs ARL-42@35MPa capacity 80.0kN [CONDITIONAL: conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed]",
+        "governing": false,
+        "handling_state": "ROAD_TRANSPORT",
+        "anchor_id": "A2",
+        "conditional_on": "conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed"
+      },
+      {
+        "check_name": "reaction_nonnegative",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 31.42,
+        "capacity": null,
+        "utilisation": null,
+        "governing_input": "",
+        "rule_reference": "brief 3.5 step 4 (plumb lift, CoG between the picks)",
+        "explanation": "ERECTION A1: reaction 31.42kN (must be >=0 for a stable 2-point lift)",
+        "governing": false,
+        "handling_state": "ERECTION",
+        "anchor_id": "A1",
+        "conditional_on": ""
+      },
+      {
+        "check_name": "axial_capacity",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 31.42,
+        "capacity": 80,
+        "utilisation": 0.393,
+        "governing_input": "",
+        "rule_reference": "brief 3.3 F <= N_zul",
+        "explanation": "ERECTION: demand 31.4kN vs ARL-42@35MPa capacity 80.0kN [CONDITIONAL: conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed]",
+        "governing": false,
+        "handling_state": "ERECTION",
+        "anchor_id": "A1",
+        "conditional_on": "conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed"
+      },
+      {
+        "check_name": "reaction_nonnegative",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 31.42,
+        "capacity": null,
+        "utilisation": null,
+        "governing_input": "",
+        "rule_reference": "brief 3.5 step 4 (plumb lift, CoG between the picks)",
+        "explanation": "ERECTION A2: reaction 31.42kN (must be >=0 for a stable 2-point lift)",
+        "governing": false,
+        "handling_state": "ERECTION",
+        "anchor_id": "A2",
+        "conditional_on": ""
+      },
+      {
+        "check_name": "axial_capacity",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 31.42,
+        "capacity": 80,
+        "utilisation": 0.393,
+        "governing_input": "",
+        "rule_reference": "brief 3.3 F <= N_zul",
+        "explanation": "ERECTION: demand 31.4kN vs ARL-42@35MPa capacity 80.0kN [CONDITIONAL: conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed]",
+        "governing": false,
+        "handling_state": "ERECTION",
+        "anchor_id": "A2",
+        "conditional_on": "conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed"
+      },
+      {
+        "check_name": "reaction_nonnegative",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 24.68,
+        "capacity": null,
+        "utilisation": null,
+        "governing_input": "",
+        "rule_reference": "brief 3.5 step 4 (plumb lift, CoG between the picks)",
+        "explanation": "TURN_TILTING_TABLE A1: reaction 24.68kN (must be >=0 for a stable 2-point lift)",
+        "governing": false,
+        "handling_state": "TURN_TILTING_TABLE",
+        "anchor_id": "A1",
+        "conditional_on": ""
+      },
+      {
+        "check_name": "axial_capacity",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 24.68,
+        "capacity": 60,
+        "utilisation": 0.411,
+        "governing_input": "",
+        "rule_reference": "brief 3.3 F <= N_zul",
+        "explanation": "TURN_TILTING_TABLE: demand 24.7kN vs ARL-42@15MPa capacity 60.0kN [CONDITIONAL: conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed]",
+        "governing": false,
+        "handling_state": "TURN_TILTING_TABLE",
+        "anchor_id": "A1",
+        "conditional_on": "conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed"
+      },
+      {
+        "check_name": "reaction_nonnegative",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 24.68,
+        "capacity": null,
+        "utilisation": null,
+        "governing_input": "",
+        "rule_reference": "brief 3.5 step 4 (plumb lift, CoG between the picks)",
+        "explanation": "TURN_TILTING_TABLE A2: reaction 24.68kN (must be >=0 for a stable 2-point lift)",
+        "governing": false,
+        "handling_state": "TURN_TILTING_TABLE",
+        "anchor_id": "A2",
+        "conditional_on": ""
+      },
+      {
+        "check_name": "axial_capacity",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 24.68,
+        "capacity": 60,
+        "utilisation": 0.411,
+        "governing_input": "",
+        "rule_reference": "brief 3.3 F <= N_zul",
+        "explanation": "TURN_TILTING_TABLE: demand 24.7kN vs ARL-42@15MPa capacity 60.0kN [CONDITIONAL: conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed]",
+        "governing": false,
+        "handling_state": "TURN_TILTING_TABLE",
+        "anchor_id": "A2",
+        "conditional_on": "conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed"
+      },
+      {
+        "check_name": "reaction_nonnegative",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 31.42,
+        "capacity": null,
+        "utilisation": null,
+        "governing_input": "",
+        "rule_reference": "brief 3.5 step 4 (plumb lift, CoG between the picks)",
+        "explanation": "TURN_FREE_CRANE A1: reaction 31.42kN (must be >=0 for a stable 2-point lift)",
+        "governing": false,
+        "handling_state": "TURN_FREE_CRANE",
+        "anchor_id": "A1",
+        "conditional_on": ""
+      },
+      {
+        "check_name": "axial_capacity",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 31.42,
+        "capacity": 60,
+        "utilisation": 0.524,
+        "governing_input": "",
+        "rule_reference": "brief 3.3 F <= N_zul",
+        "explanation": "TURN_FREE_CRANE: demand 31.4kN vs ARL-42@15MPa capacity 60.0kN [CONDITIONAL: conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed]",
+        "governing": false,
+        "handling_state": "TURN_FREE_CRANE",
+        "anchor_id": "A1",
+        "conditional_on": "conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed"
+      },
+      {
+        "check_name": "reaction_nonnegative",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 31.42,
+        "capacity": null,
+        "utilisation": null,
+        "governing_input": "",
+        "rule_reference": "brief 3.5 step 4 (plumb lift, CoG between the picks)",
+        "explanation": "TURN_FREE_CRANE A2: reaction 31.42kN (must be >=0 for a stable 2-point lift)",
+        "governing": false,
+        "handling_state": "TURN_FREE_CRANE",
+        "anchor_id": "A2",
+        "conditional_on": ""
+      },
+      {
+        "check_name": "axial_capacity",
+        "state": "PASS",
+        "scope": "CANDIDATE",
+        "demand": 31.42,
+        "capacity": 60,
+        "utilisation": 0.524,
+        "governing_input": "",
+        "rule_reference": "brief 3.3 F <= N_zul",
+        "explanation": "TURN_FREE_CRANE: demand 31.4kN vs ARL-42@15MPa capacity 60.0kN [CONDITIONAL: conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed]",
+        "governing": false,
+        "handling_state": "TURN_FREE_CRANE",
+        "anchor_id": "A2",
+        "conditional_on": "conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed"
+      },
+      {
+        "check_name": "supplementary_reinforcement",
+        "state": "UNKNOWN",
+        "scope": "PROBLEM",
+        "demand": null,
+        "capacity": null,
+        "utilisation": null,
+        "governing_input": "",
+        "rule_reference": "brief 3.3 / Figure 2 / 3.6 hard stop",
+        "explanation": "input does not confirm whether the anchor's supplementary reinforcement (Zulage) is placed; tabulated capacity cannot be claimed without it",
+        "governing": false,
+        "handling_state": "",
+        "anchor_id": "",
+        "conditional_on": ""
+      },
+      {
+        "check_name": "clutch_match",
+        "state": "PASS",
+        "scope": "PROBLEM",
+        "demand": null,
+        "capacity": null,
+        "utilisation": null,
+        "governing_input": "",
+        "rule_reference": "brief 3.3 matching clutch / 3.6 hard stop",
+        "explanation": "clutch 'RU-42' matches ARL-42's required 'RU-42'",
+        "governing": false,
+        "handling_state": "",
+        "anchor_id": "",
+        "conditional_on": ""
+      }
+    ],
+    "governing_check": {
+      "check_name": "axial_capacity",
+      "state": "PASS",
+      "scope": "CANDIDATE",
+      "demand": 36.22,
+      "capacity": 60,
+      "utilisation": 0.604,
+      "governing_input": "",
+      "rule_reference": "brief 3.3 F <= N_zul",
+      "explanation": "DEMOULD: demand 36.2kN vs ARL-42@15MPa capacity 60.0kN [CONDITIONAL: conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed]",
+      "governing": true,
+      "handling_state": "DEMOULD",
+      "anchor_id": "A1",
+      "conditional_on": "conditional on supplementary reinforcement (currently UNKNOWN): the tabulated capacity is not claimable as verified until Figure 2's Zulage is confirmed placed"
+    },
+    "rig": {
+      "spreader_required": true,
+      "reason": "Panel thickness 180 mm is below ARL-42's 240 mm transverse minimum wall requirement."
+    }
+  },
+  "rfis": [
+    {
+      "id": "RFI-GEOMETRY",
+      "message": "Resolve geometry discrepancy before finalising placement: approval_design length 4700mm vs ifc_export length 4300mm; approval_design has 2 opening(s) vs ifc_export has 0; ifc_export length 4300mm vs ifc_geometry length 4700mm",
+      "rule_reference": "brief 3.6 hard stop 1"
+    },
+    {
+      "id": "RFI-TURN-METHOD",
+      "message": "Confirm turn method (currently UNCONFIRMED). The conservative free-crane weak-axis case has been run in the meantime, per brief 3.5 step 1.",
+      "rule_reference": "brief 3.6 hard stop 1"
+    },
+    {
+      "id": "RFI-SUPPLEMENTARY-REINFORCEMENT",
+      "message": "Confirm the anchor's supplementary reinforcement (Zulage, Figure 2) is detailed and placed at each anchor location; the tabulated capacity is invalid without it.",
+      "rule_reference": "brief 3.3 / Figure 2 / 3.6 hard stop"
+    },
+    {
+      "id": "RFI-SELF-WEIGHT",
+      "message": "Explain/reconcile computed self-weight against the brief's reference value: Computed self-weight (44.9 kN) does not reconcile with the brief's reference figure (72.6 kN); the reference value's provenance cannot be established from the supplied geometry+density, so it is NOT used as an authoritative input (see DESIGN_NOTE.md).",
+      "rule_reference": "brief Figure 1"
+    }
+  ],
+  "rule_trace": [
+    {
+      "step": "self_weight",
+      "result": "COMPUTED",
+      "value_kN": 44.88,
+      "source": "approval_design",
+      "discrepancy_kN": -27.72,
+      "density_kg_per_m3": 2400,
+      "concrete_class": "C32/40"
+    },
+    {
+      "step": "cog",
+      "result": "COMPUTED",
+      "x_mm": 2344.5,
+      "y_mm": 1603.8,
+      "source": "approval_design"
+    },
+    {
+      "step": "anchor_trial",
+      "result": "COMPUTED",
+      "x1_mm": 972.9,
+      "x2_mm": 3727.1
+    },
+    {
+      "step": "anchor_shift_to_cog",
+      "result": "COMPUTED",
+      "x1_mm": 967.4,
+      "x2_mm": 3721.6
+    },
+    {
+      "step": "min_wall_axial",
+      "result": "PASS",
+      "anchor": "ARL-42"
+    },
+    {
+      "step": "edge_distance",
+      "result": "PASS",
+      "anchor": "ARL-42"
+    },
+    {
+      "step": "axis_spacing",
+      "result": "PASS",
+      "anchor": "ARL-42"
+    },
+    {
+      "step": "opening_void_clash",
+      "result": "PASS"
+    },
+    {
+      "step": "rig_decision",
+      "result": "COMPUTED",
+      "spreader_required": true,
+      "anchor": "ARL-42"
+    },
+    {
+      "step": "load_DEMOULD",
+      "result": "COMPUTED",
+      "F_total_kN": 72.44
+    },
+    {
+      "step": "reactions",
+      "result": "COMPUTED",
+      "r1_kN": 36.22,
+      "r2_kN": 36.22
+    },
+    {
+      "step": "strength_column",
+      "result": "COMPUTED",
+      "requirement": "first_lift",
+      "column_mpa": 15
+    },
+    {
+      "step": "capacity_DEMOULD_A1",
+      "result": "PASS",
+      "demand_kN": 36.22,
+      "utilisation": 0.604
+    },
+    {
+      "step": "capacity_DEMOULD_A2",
+      "result": "PASS",
+      "demand_kN": 36.22,
+      "utilisation": 0.604
+    },
+    {
+      "step": "load_STORAGE",
+      "result": "COMPUTED",
+      "F_total_kN": 44.88
+    },
+    {
+      "step": "reactions",
+      "result": "COMPUTED",
+      "r1_kN": 22.44,
+      "r2_kN": 22.44
+    },
+    {
+      "step": "strength_column",
+      "result": "COMPUTED",
+      "requirement": "first_lift",
+      "column_mpa": 15
+    },
+    {
+      "step": "capacity_STORAGE_A1",
+      "result": "PASS",
+      "demand_kN": 22.44,
+      "utilisation": 0.374
+    },
+    {
+      "step": "capacity_STORAGE_A2",
+      "result": "PASS",
+      "demand_kN": 22.44,
+      "utilisation": 0.374
+    },
+    {
+      "step": "load_ROAD_TRANSPORT",
+      "result": "COMPUTED",
+      "F_total_kN": 89.76
+    },
+    {
+      "step": "reactions",
+      "result": "COMPUTED",
+      "r1_kN": 44.88,
+      "r2_kN": 44.88
+    },
+    {
+      "step": "strength_column",
+      "result": "COMPUTED",
+      "requirement": "full",
+      "column_mpa": 35
+    },
+    {
+      "step": "capacity_ROAD_TRANSPORT_A1",
+      "result": "PASS",
+      "demand_kN": 44.88,
+      "utilisation": 0.561
+    },
+    {
+      "step": "capacity_ROAD_TRANSPORT_A2",
+      "result": "PASS",
+      "demand_kN": 44.88,
+      "utilisation": 0.561
+    },
+    {
+      "step": "load_ERECTION",
+      "result": "COMPUTED",
+      "F_total_kN": 62.83
+    },
+    {
+      "step": "reactions",
+      "result": "COMPUTED",
+      "r1_kN": 31.42,
+      "r2_kN": 31.42
+    },
+    {
+      "step": "strength_column",
+      "result": "COMPUTED",
+      "requirement": "full",
+      "column_mpa": 35
+    },
+    {
+      "step": "capacity_ERECTION_A1",
+      "result": "PASS",
+      "demand_kN": 31.42,
+      "utilisation": 0.393
+    },
+    {
+      "step": "capacity_ERECTION_A2",
+      "result": "PASS",
+      "demand_kN": 31.42,
+      "utilisation": 0.393
+    },
+    {
+      "step": "load_TURN_TILTING_TABLE",
+      "result": "COMPUTED",
+      "F_total_kN": 49.37
+    },
+    {
+      "step": "reactions",
+      "result": "COMPUTED",
+      "r1_kN": 24.68,
+      "r2_kN": 24.68
+    },
+    {
+      "step": "strength_column",
+      "result": "COMPUTED",
+      "requirement": "first_lift",
+      "column_mpa": 15
+    },
+    {
+      "step": "capacity_TURN_TILTING_TABLE_A1",
+      "result": "PASS",
+      "demand_kN": 24.68,
+      "utilisation": 0.411
+    },
+    {
+      "step": "capacity_TURN_TILTING_TABLE_A2",
+      "result": "PASS",
+      "demand_kN": 24.68,
+      "utilisation": 0.411
+    },
+    {
+      "step": "load_TURN_FREE_CRANE",
+      "result": "COMPUTED",
+      "F_total_kN": 62.83
+    },
+    {
+      "step": "reactions",
+      "result": "COMPUTED",
+      "r1_kN": 31.42,
+      "r2_kN": 31.42
+    },
+    {
+      "step": "strength_column",
+      "result": "COMPUTED",
+      "requirement": "first_lift",
+      "column_mpa": 15
+    },
+    {
+      "step": "capacity_TURN_FREE_CRANE_A1",
+      "result": "PASS",
+      "demand_kN": 31.42,
+      "utilisation": 0.524
+    },
+    {
+      "step": "capacity_TURN_FREE_CRANE_A2",
+      "result": "PASS",
+      "demand_kN": 31.42,
+      "utilisation": 0.524
+    },
+    {
+      "step": "supplementary_reinforcement",
+      "result": "UNKNOWN"
+    },
+    {
+      "step": "clutch_match",
+      "result": "PASS",
+      "anchor": "ARL-42"
+    }
+  ],
+  "assumptions": [
+    "C32/40 is interpreted using the cube-strength value (40 MPa) when matching the lifting-anchor catalogue strength columns (brief 3.2/3.3) -- the only reading consistent with the brief's own C32/40 worked example (72.6/80 = 0.91 against ARL-42's '@35 MPa' column). See DESIGN_NOTE.md.",
+    "Self-weight is derived deterministically from geometry x density, not from the brief's indicative 72.6 kN figure -- that figure's provenance cannot be established from the supplied geometry, so it is reported as a reference value only, never used as an authoritative engineering input.",
+    "No sling/rigging angle is provided in the input; the engineering core assumes vertical slings (z=1.0), which is consistent with the rig decision -- a spreader is mandatory for every catalogue anchor against this panel's 180mm thickness, so beta=0 always applies here regardless.",
+    "The POC does not perform continuous anchor-position optimisation: the placement policy is strictly trial-at-0.207L then shift-to-CoG; if that one shifted position violates a placement constraint, the candidate simply fails and the next catalogue candidate is tried (brief 3.5 steps 5-7).",
+    "Existing 'Wire Loop Box' cast-in proxies found in WC001.ifc are not lifting anchors (no matching row in the brief 3.3 catalogue) and are excluded from the engineering calculation.",
+    "Opening voids were not extracted from WC001.ifc's raw faceted-BREP geometry (see ifc_geometry.py); that source's opening count is treated as UNKNOWN, not confirmed-zero."
+  ],
+  "requires_human_signoff": true,
+  "engineering_core_version": "0.1.0",
+  "rule_set_version": "assessment-v1",
+  "catalogue_version": "synthetic-poc-v1"
+}

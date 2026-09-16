@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 944 650" font-family="Arial">
+<rect x="0" y="0" width="944" height="650" fill="white"/>
+<text x="60" y="26" font-size="13" fill="#52606d" letter-spacing="1">WC001 -- LIFTING ANALYSIS</text>
+<text x="60" y="54" font-size="26" font-weight="bold" fill="#c0392b">STATUS: HOLD</text>
+<text x="60" y="76" font-size="14" font-weight="bold" fill="#c0392b">Reason: Geometry conflict -- placement unresolved</text>
+<line x1="0" y1="86" x2="944" y2="86" stroke="#d2d6dc" stroke-width="1"/>
+<rect x="60.0" y="150.0" width="564.0" height="360.0" fill="#f5f7fa" stroke="#1f2933" stroke-width="1.8"/>
+<text x="60.0" y="110.0" font-size="11" fill="#c0392b" font-weight="bold">ILLUSTRATIVE CANDIDATE (approval_design) -- NOT A RESOLVED PLACEMENT</text>
+<rect x="198.0" y="258.0" width="132.0" height="252.0" fill="#e4e7eb" stroke="#52606d" stroke-width="1" stroke-dasharray="4 3"/>
+<text x="264.0" y="384.0" font-size="10" fill="#52606d" text-anchor="middle" dominant-baseline="middle">door</text>
+<rect x="426.0" y="276.0" width="144.0" height="120.0" fill="#e4e7eb" stroke="#52606d" stroke-width="1" stroke-dasharray="4 3"/>
+<text x="498.0" y="336.0" font-size="10" fill="#52606d" text-anchor="middle" dominant-baseline="middle">window</text>
+<circle cx="341.3" cy="317.5" r="8" fill="white" stroke="#1f2933" stroke-width="1.4"/>
+<line x1="341.3" y1="150.0" x2="341.3" y2="510.0" stroke="#1f2933" stroke-width="0.8" stroke-dasharray="3 3"/>
+<text x="353.3" y="317.5" font-size="10" fill="#1f2933">CoG</text>
+<circle cx="176.1" cy="150.0" r="6" fill="#c0392b"/>
+<line x1="176.1" y1="150.0" x2="176.1" y2="176.0" stroke="#c0392b" stroke-width="2"/>
+<text x="176.1" y="140.0" font-size="11" fill="#c0392b" text-anchor="middle" font-weight="bold">A1</text>
+<text x="176.1" y="190.0" font-size="9.5" fill="#52606d" text-anchor="middle">ARL-42</text>
+<circle cx="506.6" cy="150.0" r="6" fill="#c0392b"/>
+<line x1="506.6" y1="150.0" x2="506.6" y2="176.0" stroke="#c0392b" stroke-width="2"/>
+<text x="506.6" y="140.0" font-size="11" fill="#c0392b" text-anchor="middle" font-weight="bold">A2</text>
+<text x="506.6" y="190.0" font-size="9.5" fill="#52606d" text-anchor="middle">ARL-42</text>
+<line x1="176.1" y1="128.0" x2="506.6" y2="128.0" stroke="#9aa5b1" stroke-width="1"/>
+<text x="341.3" y="123.0" font-size="10" fill="#52606d" text-anchor="middle">spacing 2754mm</text>
+<text x="60.0" y="532.0" font-size="11" fill="#1f2933">Rig: SPREADER REQUIRED -- Panel thickness 180 mm is below ARL-42's 240 mm transverse minimum wall requirement.</text>
+<rect x="644.0" y="140.0" width="240" height="380.0" rx="6" fill="#fbfcfd" stroke="#9aa5b1" stroke-width="1"/>
+<text x="654.0" y="160.0" font-size="12" font-weight="bold" fill="#1f2933">WC001 -- lifting data</text>
+<text x="654.0" y="182.0" font-size="10" font-weight="bold" fill="#52606d">illustrative check only:</text>
+<text x="654.0" y="196.0" font-size="10" fill="#52606d">DEMOULD / A1</text>
+<text x="654.0" y="212.0" font-size="10" fill="#c0392b">utilisation: 0.60</text>
+<text x="654.0" y="226.0" font-size="8.5" fill="#9c6a13" font-weight="bold">CONDITIONAL (not verified):</text>
+<text x="654.0" y="238.0" font-size="8.5" fill="#9c6a13">reinforcement not confirmed -- see RFI</text>
+<text x="654.0" y="250.0" font-size="8.5" fill="#9c6a13">NOTE: not used for final acceptance</text>
+<text x="654.0" y="262.0" font-size="8.5" fill="#9c6a13">(result is not resolved -- see Reason).</text>
+<text x="654.0" y="282.0" font-size="9" fill="#9c6a13">RFI: Resolve geometry discrepancy before finalis...</text>
+<text x="654.0" y="296.0" font-size="9" fill="#9c6a13">RFI: Confirm turn method (currently UNCONFIRMED)...</text>
+<text x="654.0" y="310.0" font-size="9" fill="#9c6a13">RFI: Confirm the anchor's supplementary reinforc...</text>
+<text x="654.0" y="324.0" font-size="9" fill="#9c6a13">RFI: Explain/reconcile computed self-weight agai...</text>
+</svg>
