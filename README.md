@@ -9,11 +9,20 @@ architecture, the determinism boundary, and documented assumptions.
 
 **The determinism boundary, in one paragraph:** the agent uses deterministic engineering rules
 to calculate geometry, CoG, reactions, handling loads, catalogue capacity, and pass/fail
-results -- that layer is authoritative. The AI Reasoner is deliberately bounded to
-orchestration: it can select which permitted anchor candidate to try next and produce
-explanations, but it cannot supply or override any engineering number or the final status.
-`MockReasoner` (the default) is fully deterministic and offline; `LLMReasoner` is optional and
-only activates if `ANTHROPIC_API_KEY` is set -- either way, the engineering result is identical.
+results -- that layer is authoritative, and it performs its own bounded design iteration
+internally (see below). The AI Reasoner is deliberately bounded to orchestration: it can select
+which permitted anchor candidate to try next and produce explanations, but it cannot supply or
+override any engineering number, position, or the final status. `MockReasoner` (the default) is
+fully deterministic and offline; `LLMReasoner` is optional and only activates if
+`ANTHROPIC_API_KEY` is set -- either way, the engineering result is identical.
+
+**Two independent, separate iteration mechanisms exist, neither touched by the Reasoner:**
+1. **Bounded deterministic design iteration** -- if the trial anchor position (0.207L, shifted to
+   the centre of gravity) fails minimum edge distance or axis spacing, the engineering core
+   attempts exactly one analytically-derived "move in" position (from the anchor's own catalogue
+   limits) before giving up on that candidate. Not a search or optimiser -- see `DESIGN_NOTE.md`.
+2. **Catalogue candidate iteration** -- if a candidate still fails (position iteration included),
+   the next permitted anchor type is tried, in a fixed deterministic order.
 
 ## What's required vs optional
 
@@ -99,11 +108,14 @@ python -m liftagent run data/wc001.json --reinforcement-confirmed true
 pytest -q
 ```
 
-**208 tests**, covering:
+**217 tests**, covering:
 
 - deterministic engineering: self-weight, CoG, equilibrium/reaction calculations, trial
   placement + CoG shift, catalogue capacity lookups, utilisation, and the governing check
   (`test_engineering.py`, `test_end_to_end.py`)
+- the bounded "move in" position-iteration fallback -- including the exact case that motivated
+  it, proof it's skipped when not needed, proof it can't bypass hard stops, determinism, and
+  proof it doesn't interfere with catalogue candidate iteration (`test_position_iteration.py`)
 - geometry conflict handling and provenance -- WC001's real approval-vs-IFC disagreement, and
   never silently selecting a geometry when sources disagree (`test_conflict.py`)
 - IFC extraction from the real `WC001.ifc` file (`test_ifc_geometry.py` -- skipped gracefully,
@@ -130,10 +142,11 @@ reports fewer passing tests -- this is expected, documented behaviour, not a bro
 ## Deterministic mode vs optional LLM mode
 
 By default the agent's bounded `Reasoner` (used only to pick the next catalogue candidate to
-try) is `MockReasoner` -- fully deterministic, offline, reproducible. If `ANTHROPIC_API_KEY` is
-set, `LLMReasoner` is used instead; it can only ever return the same small typed action (which
-anchor to try next) or explanation text -- never an engineering number or a status. See
-`DESIGN_NOTE.md` for why.
+try -- never to move an anchor, which is the engineering core's own bounded fallback, not a
+Reasoner decision) is `MockReasoner` -- fully deterministic, offline, reproducible. If
+`ANTHROPIC_API_KEY` is set, `LLMReasoner` is used instead; it can only ever return the same small
+typed action (which anchor to try next) or explanation text -- never an engineering number, a
+position, or a status. See `DESIGN_NOTE.md` for why.
 
 ## Safety disclaimer
 

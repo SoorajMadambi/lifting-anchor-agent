@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 
-from liftagent.schema import AgentResult, Candidate, CheckResult, GeometrySource, Opening
+from liftagent.schema import AgentResult, Candidate, CheckResult, GeometrySource, Opening, PositionIterationResult
 
 REASON_MESSAGES = {
     "UNRESOLVED_GEOMETRY_CONFLICT": "Geometry conflict -- placement unresolved",
@@ -50,6 +50,25 @@ def _check_dict(c: CheckResult) -> dict:
     }
 
 
+def _position_iteration_dict(p: PositionIterationResult | None) -> dict | None:
+    if p is None:
+        return None
+    return {
+        "attempted": p.attempted,
+        "reason": p.reason,
+        "initial_position": (None if p.initial_x1_mm is None else
+                              {"x1_mm": _round(p.initial_x1_mm, 1), "x2_mm": _round(p.initial_x2_mm, 1)}),
+        "attempts": [
+            {"x1_mm": _round(a.x1_mm, 1), "x2_mm": _round(a.x2_mm, 1),
+             "result": a.result.value, "failed_checks": list(a.failed_checks)}
+            for a in p.attempts
+        ],
+        "selected_position": (None if p.selected_x1_mm is None else
+                               {"x1_mm": _round(p.selected_x1_mm, 1), "x2_mm": _round(p.selected_x2_mm, 1)}),
+        "method": p.method,
+    }
+
+
 def _candidate_dict(c: Candidate | None) -> dict | None:
     if c is None:
         return None
@@ -63,6 +82,7 @@ def _candidate_dict(c: Candidate | None) -> dict | None:
         "checks": [_check_dict(ch) for ch in c.checks],
         "governing_check": _check_dict(c.governing_check) if c.governing_check is not None else None,
         "rig": (None if c.rig is None else {"spreader_required": c.rig.spreader_required, "reason": c.rig.reason}),
+        "position_iteration": _position_iteration_dict(c.position_iteration),
     }
 
 
@@ -142,6 +162,13 @@ def render_summary(result: AgentResult) -> str:
             lines.append("Anchors (ILLUSTRATIVE CANDIDATE -- NOT A RESOLVED PLACEMENT):")
         for a in candidate.anchors:
             lines.append(f"  {a.id}: {a.anchor_type} @ x={a.x_mm:.0f}mm, y={a.y_mm:.0f}mm (clutch {a.clutch})")
+        pi = candidate.position_iteration
+        if pi is not None and pi.attempted:
+            if pi.selected_x1_mm is not None:
+                lines.append(f"  (position iteration: {pi.reason}; moved in to "
+                             f"x1={pi.selected_x1_mm:.0f}mm, x2={pi.selected_x2_mm:.0f}mm)")
+            else:
+                lines.append(f"  (position iteration attempted and failed: {pi.reason}; no feasible position found)")
         lines.append("")
         if candidate.rig is not None:
             rig = candidate.rig

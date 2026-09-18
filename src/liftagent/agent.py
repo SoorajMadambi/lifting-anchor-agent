@@ -18,7 +18,7 @@ from liftagent import catalogue, engineering, ingest
 from liftagent.reasoner import AgentAction, Reasoner, ReasonerDecision, TryAnchorAction
 from liftagent.schema import (
     AgentResult, AnchorPlacement, Candidate, CheckResult, CheckScope, CheckState,
-    ElementInput, RFI, Status,
+    ElementInput, PositionAttempt, PositionIterationResult, RFI, Status,
 )
 from liftagent.tools import ToolBox
 from liftagent.validator import ActionRejected, validate_decision
@@ -43,9 +43,12 @@ STATIC_ASSUMPTIONS: tuple[str, ...] = (
     "No sling/rigging angle is provided in the input; the engineering core assumes vertical slings "
     "(z=1.0), which is consistent with the rig decision -- a spreader is mandatory for every catalogue "
     "anchor against this panel's 180mm thickness, so beta=0 always applies here regardless.",
-    "The POC does not perform continuous anchor-position optimisation: the placement policy is strictly "
-    "trial-at-0.207L then shift-to-CoG; if that one shifted position violates a placement constraint, "
-    "the candidate simply fails and the next catalogue candidate is tried (brief 3.5 steps 5-7).",
+    "The POC does not perform continuous anchor-position optimisation: the placement policy is "
+    "trial-at-0.207L then shift-to-CoG, with a single bounded 'move in' fallback (brief 3.5 step 11) "
+    "if that shifted position fails edge distance or axis spacing -- a closed-form feasibility check "
+    "against this anchor's own catalogue min_edge_mm/min_axis_mm, never a search or an optimiser. If no "
+    "such position exists, or another constraint (wall thickness, capacity) fails regardless, the "
+    "candidate fails and the next catalogue candidate is tried (brief 3.5 steps 5-11).",
     "Existing 'Wire Loop Box' cast-in proxies found in WC001.ifc are not lifting anchors (no matching "
     "row in the brief 3.3 catalogue) and are excluded from the engineering calculation.",
     "Opening voids were not extracted from WC001.ifc's raw faceted-BREP geometry (see ifc_geometry.py); "
@@ -117,6 +120,9 @@ def _mark_capacity_conditional(checks: list[CheckResult], reinforcement_check: C
     return updated
 
 
+POSITION_RELATED_CHECK_NAMES = ("edge_distance", "axis_spacing")
+
+
 def _evaluate_candidate(tools: ToolBox, anchor_type: str, authoritative, concrete, handling_states,
                          reinforcement_confirmed: bool | None):
     anchor = tools.get_anchor(anchor_type)
@@ -125,12 +131,63 @@ def _evaluate_candidate(tools: ToolBox, anchor_type: str, authoritative, concret
     self_weight = tools.compute_self_weight(authoritative, concrete.density_kg_per_m3, concrete.class_label)
     cog = tools.compute_cog(authoritative)
 
-    x1, x2 = tools.trial_placement(length_mm)
-    x1, x2 = tools.shift_to_cog(x1, x2, length_mm, cog.x_mm)
-    lo, hi = min(x1, x2), max(x1, x2)
+    x1_trial, x2_trial = tools.trial_placement(length_mm)
+    x1_trial, x2_trial = tools.shift_to_cog(x1_trial, x2_trial, length_mm, cog.x_mm)
+    lo_trial, hi_trial = min(x1_trial, x2_trial), max(x1_trial, x2_trial)
 
-    checks: list[CheckResult] = []
-    checks.extend(tools.check_edge_axis_wall(anchor, lo, hi, length_mm, thickness_mm))
+    # brief 3.5 step 7/11: enforce edge/axis/wall at the trial position first.
+    # If (and only if) edge distance or axis spacing is what fails, attempt the
+    # bounded "move in" search (step 11) before giving up on this candidate.
+    position_checks = tools.check_edge_axis_wall(anchor, lo_trial, hi_trial, length_mm, thickness_mm)
+    position_related_failed = [c.check_name for c in position_checks
+                                if c.check_name in POSITION_RELATED_CHECK_NAMES and c.state == CheckState.FAIL]
+
+    lo, hi = lo_trial, hi_trial
+    position_iteration = PositionIterationResult(attempted=False)
+
+    if position_related_failed:
+        reason = (f"initial trial position (a=0.207L) fails {', '.join(position_related_failed)} "
+                  f"for {anchor.name}")
+        trial_attempt = PositionAttempt(x1_mm=lo_trial, x2_mm=hi_trial, result=CheckState.FAIL,
+                                         failed_checks=tuple(position_related_failed))
+        feasible = tools.find_feasible_inward_position(anchor, length_mm, cog.x_mm)
+
+        if feasible is not None:
+            new_lo, new_hi = feasible
+            new_checks = tools.check_edge_axis_wall(anchor, new_lo, new_hi, length_mm, thickness_mm)
+            still_failed = [c.check_name for c in new_checks
+                            if c.check_name in POSITION_RELATED_CHECK_NAMES and c.state == CheckState.FAIL]
+            fallback_attempt = PositionAttempt(
+                x1_mm=new_lo, x2_mm=new_hi,
+                result=(CheckState.FAIL if still_failed else CheckState.PASS),
+                failed_checks=tuple(still_failed),
+            )
+            if not still_failed:
+                lo, hi = new_lo, new_hi
+                position_checks = new_checks
+            position_iteration = PositionIterationResult(
+                attempted=True, reason=reason,
+                initial_x1_mm=lo_trial, initial_x2_mm=hi_trial,
+                attempts=(trial_attempt, fallback_attempt),
+                selected_x1_mm=(lo if not still_failed else None),
+                selected_x2_mm=(hi if not still_failed else None),
+                method=("bounded feasibility search: smallest symmetric inward move (from each end) "
+                        "satisfying this anchor's min_edge_mm, checked against min_axis_mm "
+                        "(brief 3.5 step 11 'move in'); not an optimiser -- at most one "
+                        "analytically-derived candidate position is tried."),
+            )
+        else:
+            position_iteration = PositionIterationResult(
+                attempted=True, reason=reason,
+                initial_x1_mm=lo_trial, initial_x2_mm=hi_trial,
+                attempts=(trial_attempt,),
+                selected_x1_mm=None, selected_x2_mm=None,
+                method=("bounded feasibility search: no single position satisfies both this "
+                        "anchor's min_edge_mm and min_axis_mm simultaneously "
+                        "(brief 3.5 step 11 'move in')."),
+            )
+
+    checks: list[CheckResult] = list(position_checks)
     checks.append(tools.check_opening_void_clash(lo, hi, authoritative.openings, height_mm))
 
     rig = tools.decide_rig(anchor, thickness_mm)
@@ -161,7 +218,7 @@ def _evaluate_candidate(tools: ToolBox, anchor_type: str, authoritative, concret
 
     candidate_checks = [c for c in checks if c.scope == CheckScope.CANDIDATE]
     passed = all(c.state == CheckState.PASS for c in candidate_checks)
-    return anchors, checks, rig, self_weight, cog, passed
+    return anchors, checks, rig, self_weight, cog, passed, position_iteration
 
 
 def enforce_invariants(*, geometry_resolved: bool, turn_confirmed: bool, reinforcement_state: CheckState,
@@ -237,7 +294,7 @@ def run_agent(element: ElementInput, reasoner: Reasoner,
         anchor_type = decision.try_anchor.anchor_type
         tried.append(anchor_type)
 
-        anchors, checks, rig, self_weight, cog, passed = _evaluate_candidate(
+        anchors, checks, rig, self_weight, cog, passed, position_iteration = _evaluate_candidate(
             tools, anchor_type, authoritative, element.concrete, handling_states, reinforcement_confirmed,
         )
         last_self_weight, last_cog = self_weight, cog
@@ -248,6 +305,7 @@ def run_agent(element: ElementInput, reasoner: Reasoner,
             candidate_id=f"candidate-{anchor_type}", anchor_type=anchor_type,
             clutch=anchors[0].clutch, x1_mm=lo, x2_mm=hi,
             anchors=anchors, checks=tuple(checks), governing_check=governing_check, rig=rig,
+            position_iteration=position_iteration,
         )
 
         if passed:

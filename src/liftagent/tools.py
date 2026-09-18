@@ -55,6 +55,15 @@ class ToolBox:
             self._log(r.check_name, r.state.value, anchor=anchor.name)
         return results
 
+    def find_feasible_inward_position(self, anchor: AnchorType, length_mm: float,
+                                       cog_x_mm: float) -> tuple[float, float] | None:
+        result = engineering.find_feasible_inward_position(anchor, length_mm, cog_x_mm)
+        self._log("position_search", ("FEASIBLE" if result is not None else "INFEASIBLE"),
+                   anchor=anchor.name,
+                   x1_mm=(round(result[0], 1) if result is not None else None),
+                   x2_mm=(round(result[1], 1) if result is not None else None))
+        return result
+
     def check_opening_void_clash(self, x1: float, x2: float, openings: tuple[Opening, ...],
                                   height_mm: float) -> CheckResult:
         r = engineering.check_opening_void_clash(x1, x2, openings, height_mm)

@@ -280,6 +280,45 @@ def check_edge_axis_wall(anchor: AnchorType, x1_mm: float, x2_mm: float,
     return results
 
 
+def find_feasible_inward_position(anchor: AnchorType, length_mm: float, cog_x_mm: float) -> tuple[float, float] | None:
+    """Bounded deterministic 'move in' search -- brief 3.5 step 11's "move in"
+    remedy, and nothing more. NOT an optimiser: this derives at most ONE
+    analytically-computed candidate position, never a loop or a step-size
+    search. It is the smallest symmetric inward move (from each end, before
+    the existing CoG shift) that satisfies this anchor's own min_edge_mm,
+    checked against the same anchor's min_axis_mm. Both bounds come straight
+    from catalogue.py; nothing is invented.
+
+    Why plumb is preserved by construction: within the brief's placement
+    family (trial position at offset `a` from each end, then shifted by the
+    fixed CoG delta via shift_to_cog()), the anchor pair's MIDPOINT is always
+    exactly cog_x_mm, for ANY `a` -- shift_to_cog() adds the identical delta
+    to both x1 and x2, so varying `a` alone can never move the midpoint off
+    the CoG. Every position this function can return is therefore still
+    exactly plumb; the caller re-derives reactions via the normal
+    compute_reactions() call to confirm this (never assumed, never a 50/50
+    split), exactly as for the original trial position.
+
+    Returns the new (x1_mm, x2_mm) if a single position clears both
+    constraints, else None. Does NOT check min_wall_axial or capacity --
+    neither depends on position, so the caller must still re-check them
+    (a bigger anchor's own min_wall_axial_mm may still fail regardless of
+    where it sits; that failure is not fixable by moving anything).
+    """
+    delta = cog_x_mm - length_mm / 2.0
+    a_required = anchor.min_edge_mm + abs(delta)              # smallest inward move clearing min_edge_mm
+    a_axis_ceiling = (length_mm - anchor.min_axis_mm) / 2.0    # largest inward move still clearing min_axis_mm
+
+    if a_required > a_axis_ceiling:
+        return None  # no single position clears both constraints for this anchor
+    if a_required >= length_mm / 2.0:
+        return None  # would push anchors past the panel midpoint -- not a valid inward move
+
+    x1 = a_required + delta
+    x2 = (length_mm - a_required) + delta
+    return x1, x2
+
+
 # --------------------------------------------------------------------------
 # Clash checks (plan section 18) -- opening void is deterministic PASS/FAIL;
 # 3D reinforcement clash is UNKNOWN unless explicitly confirmed in the input.

@@ -272,19 +272,27 @@ def test_8j2_unconfirmed_turn_method_holds():
     assert result.resolved_candidate is None
 
 
-def test_8j3_invalid_edge_distance_rejects():
-    """L=1200mm -> trial edge distance a=0.207*1200~=248mm, below every
-    catalogue anchor's min_edge_mm (smallest is 300mm) -- the search
-    exhausts the whole catalogue and REJECTs, with the last-tried
-    candidate's own edge_distance check FAILing."""
+def test_8j3_invalid_edge_distance_genuinely_infeasible_rejects():
+    """L=800mm -> trial edge distance a=0.207*800~=165.6mm, below every
+    catalogue anchor's min_edge_mm (smallest is 300mm). Unlike the L=1200mm
+    case (see tests/test_position_iteration.py TEST A), this length is short
+    enough that even CFS-WAL-30's bounded 'move in' search cannot find a
+    single position that clears both min_edge_mm (300mm) and min_axis_mm
+    (600mm) simultaneously -- moving in far enough for edge distance leaves
+    only 800-2*300=200mm of spacing, well under the 600mm required. So this
+    remains a genuine REJECT even with position iteration in place."""
     result = _run_resolved(geometry_sources=(
-        make_geometry_source(length_mm=1200.0, height_mm=3000.0, thickness_mm=180.0,
+        make_geometry_source(length_mm=800.0, height_mm=3000.0, thickness_mm=180.0,
                               role=SourceRole.AUTHORITATIVE_DESIGN, name="approval_design"),
     ))
     assert result.status == Status.REJECT
     assert result.illustrative_candidate is not None
     edge_checks = [c for c in result.illustrative_candidate.checks if c.check_name == "edge_distance"]
     assert edge_checks and edge_checks[0].state == CheckState.FAIL
+    # position iteration was attempted but could not find a feasible position
+    pi = result.illustrative_candidate.position_iteration
+    assert pi is not None and pi.attempted is True
+    assert pi.selected_x1_mm is None and pi.selected_x2_mm is None
 
 
 def test_8j4_invalid_axis_spacing_is_detected_by_the_deterministic_check():

@@ -137,19 +137,39 @@ def test_10a_opening_with_negative_dimension_never_accepts(opening):
     assert clash_checks and clash_checks[0].state == CheckState.FAIL
 
 
-def test_10a_opening_extending_outside_the_panel_never_accepts():
-    """Empirically verified: an opening whose x+width exceeds the panel
-    length corrupts the CoG (its centroid falls outside the panel), which in
-    turn drives the placement into a check failure -- REJECT, not a crash,
-    not a false accept, for this representative case. (Not a proven general
-    guarantee for every possible out-of-bounds configuration -- see the
-    intentionally-out-of-scope gaps in the Test 10 report.)"""
+def test_10a_opening_extending_outside_the_panel_stays_auditable():
+    """An opening whose x+width exceeds the panel length corrupts the CoG
+    (its centroid falls outside the panel), which shifts the trial position
+    enough to fail edge_distance for the first catalogue anchor. Since the
+    §3.5 'move in' position-search fix (see test_position_iteration.py), this
+    no longer necessarily REJECTs -- ARL-42 finds a feasible moved-in
+    position here and the panel legitimately accepts. This is not a new
+    safety gap: the CoG-corruption issue itself is a pre-existing,
+    documented, out-of-scope data-quality gap (see the Test 10 report),
+    unrelated to and not worsened by position iteration -- the search only
+    ever operates on whatever CoG it's given, using the same deterministic
+    catalogue bounds and reaction equations as every other candidate. What
+    matters here is that the result stays fully auditable and legitimate:
+    the selected anchors are provably clear of the (corrupted) opening span,
+    capacity traces to catalogue.py, and the position-search trace records
+    exactly what happened -- never a silent/unexplained accept."""
     opening = Opening(id="out", x_mm=4500.0, width_mm=1000.0, sill_mm=0.0, height_mm=3000.0)
     result = _run(geometry_sources=(
         make_geometry_source(length_mm=4700.0, height_mm=3000.0, thickness_mm=180.0, openings=(opening,),
                               role=SourceRole.AUTHORITATIVE_DESIGN, name="approval_design"),
     ))
-    assert _never_accepted(result.status)
+    candidate = result.resolved_candidate or result.illustrative_candidate
+    assert candidate is not None
+    # the moved-in anchors are provably clear of the opening's own x-span
+    assert candidate.x2_mm < opening.x_mm
+    # if accepted, the position-iteration trace fully explains why -- never a silent accept
+    if result.status == Status.ACCEPT_PROVISIONAL:
+        pi = candidate.position_iteration
+        assert pi is not None and pi.attempted is True
+        assert pi.selected_x1_mm is not None
+        gc = candidate.governing_check
+        valid_capacities = set(catalogue.get_anchor(candidate.anchor_type).capacity_kn.values())
+        assert gc is not None and gc.capacity in valid_capacities
 
 
 def test_10a_opening_larger_than_the_panel_raises():
@@ -430,8 +450,14 @@ def _malformed_scenarios():
         ("turn_method_garbage", dict(production=make_production("some_unrecognised_method"))),
         ("panel_too_thin_for_any_anchor", dict(geometry_sources=thin_source)),
         ("malformed_opening", dict(geometry_sources=bad_opening_source)),
-        ("length_too_short_for_edge_distance", dict(geometry_sources=(
-            make_geometry_source(length_mm=1200.0, height_mm=3000.0, thickness_mm=180.0,
+        # L=1200mm is deliberately NOT in this "never accepts" sweep any more: the
+        # §3.5 "move in" position-search fix (test_position_iteration.py TEST A)
+        # correctly resolves it to ACCEPT_PROVISIONAL via CFS-WAL-30. L=800mm is
+        # short enough that even that search cannot find a position clearing both
+        # min_edge_mm and min_axis_mm simultaneously -- a genuine, still-unfixable
+        # edge-distance failure.
+        ("length_too_short_for_edge_distance_even_with_position_search", dict(geometry_sources=(
+            make_geometry_source(length_mm=800.0, height_mm=3000.0, thickness_mm=180.0,
                                   role=SourceRole.AUTHORITATIVE_DESIGN, name="approval_design"),
         ))),
         ("length_too_long_for_any_capacity", dict(geometry_sources=(

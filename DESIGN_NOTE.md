@@ -54,16 +54,16 @@ utilisation. `validator.py` rejects any untrusted raw payload carrying unexpecte
 anchor not in `catalogue.py`. `agent.py::enforce_invariants()` always recomputes the final status
 from the raw deterministic checks -- the Reasoner's opinion is never read.
 
-The adversarial and end-to-end workflow suites (`test_reasoner_security.py`,
-`test_agent_workflow.py`, `test_agent.py`) prove this holds under attack: an `EvilReasoner` that
-hallucinates a nonexistent anchor is rejected every time and falls back to the same deterministic
-try-order `MockReasoner` uses; raw-payload injection tests confirm a smuggled capacity/force/CoG/
-utilisation/status field is rejected outright; and two independent Reasoner implementations are
-shown to produce byte-identical engineering results, proving `Reasoner != engineering calculator`.
+The adversarial and end-to-end workflow test suites prove this holds under attack, not just in the
+happy path: an `EvilReasoner` hallucinating a nonexistent anchor is rejected every time and falls
+back to the same deterministic try-order `MockReasoner` uses; raw-payload injection tests confirm
+a smuggled capacity/force/CoG/utilisation/status field is rejected outright; and two independent
+Reasoner implementations produce byte-identical engineering results, proving
+`Reasoner != engineering calculator`.
 
 For WC001 specifically, most workflow decisions turn out to be fully deterministic -- usually
 exactly one candidate anchor is worth trying first. The Reasoner is an extension point for genuine
-choice and exception handling, not a conversational wrapper around every calculation.
+choice, not a conversational wrapper around every calculation.
 
 ## Geometry conflict -- three disagreeing sources
 
@@ -79,6 +79,23 @@ Any disagreement forces `status = HOLD, selected_geometry = null`. The engineeri
 *evaluated* against the `AUTHORITATIVE_DESIGN` source so a checking engineer has something
 concrete to inspect -- but that calculation is written only to `illustrative_candidate`, never
 `resolved_candidate`, and both the JSON and SVG label it "not a resolved placement."
+
+## Bounded position iteration ("move in")
+
+A §3.5 audit found one gap: trial `a=0.207L` shifted to the CoG (steps 5-6) simply failed the
+candidate if it violated edge distance or axis spacing, never attempting step 11's "move in"
+remedy. Fix, narrowly scoped: `engineering.find_feasible_inward_position()` derives the smallest
+symmetric inward move clearing the failing anchor's own `min_edge_mm`, checked against its
+`min_axis_mm` -- both bounds from `catalogue.py`, nothing invented. Moving both anchors in by a
+constant amount can't move the pair's midpoint off the CoG (the constant cancels), so plumb holds
+by construction; reactions are still recomputed via the existing `compute_reactions()`, never
+assumed. A closed-form check for **at most one** position, not a search or optimiser -- if none
+exists, the candidate fails as before and the next catalogue anchor is tried. The Reasoner never
+sees a position; this is entirely internal to the engineering core. `Candidate.position_iteration`
+records what was attempted, what failed, and what was selected, for the same auditability as
+every other decision. `Status.ITERATE` remains structurally unreachable as a final status
+(intentionally -- this iteration is internal to one candidate's evaluation, not an externally
+meaningful state).
 
 ## Self-weight: derived, not copied from the figure
 
@@ -112,9 +129,9 @@ number; that boundary is what this whole design enforces and tests against.
 
 ## POC-grade vs production-grade
 
-**POC:** two-anchor lifts only; no continuous anchor-position optimisation (a CoG-shifted trial
-position that violates a constraint simply fails that candidate, the next catalogue anchor is
-tried); opening-void clash is checked, but exact 3D reinforcement/trimmer clash is always
+**POC:** two-anchor lifts only; no continuous anchor-position optimisation -- only the single
+bounded "move in" fallback described above, never a general search; opening-void clash is
+checked, but exact 3D reinforcement/trimmer clash is always
 `UNKNOWN` and correctly forces HOLD rather than a fabricated PASS; vertical-sling assumption
 (z=1.0), moot for WC001 since every catalogue anchor's transverse min-wall exceeds this panel's
 180mm thickness; IFC opening extraction not attempted (would need polygon reconstruction from

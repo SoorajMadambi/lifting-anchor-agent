@@ -208,6 +208,35 @@ class RigResult:
 
 
 @dataclass(frozen=True)
+class PositionAttempt:
+    """One position tried during the bounded 'move in' search (brief 3.5
+    step 11). `result` reuses the existing three-state CheckState enum --
+    no new state was introduced for this."""
+    x1_mm: float
+    x2_mm: float
+    result: CheckState
+    failed_checks: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class PositionIterationResult:
+    """Audit trail for the bounded 'move in' search. attempted=False means
+    the initial trial position already satisfied edge distance and axis
+    spacing, so no search was needed. `attempts` is always a small,
+    analytically-derived, bounded list (0-2 entries) -- never an
+    unbounded/looping search; this is a feasibility check, not an
+    optimiser (see engineering.find_feasible_inward_position)."""
+    attempted: bool
+    reason: str = ""
+    initial_x1_mm: float | None = None
+    initial_x2_mm: float | None = None
+    attempts: tuple[PositionAttempt, ...] = ()
+    selected_x1_mm: float | None = None
+    selected_x2_mm: float | None = None
+    method: str = ""
+
+
+@dataclass(frozen=True)
 class Candidate:
     """One evaluated anchor candidate. Never presented as accepted on its own
     -- AgentResult splits every Candidate into either `resolved_candidate`
@@ -224,6 +253,7 @@ class Candidate:
     checks: tuple[CheckResult, ...]
     governing_check: CheckResult | None
     rig: RigResult | None
+    position_iteration: PositionIterationResult | None = None
 
 
 @dataclass(frozen=True)
