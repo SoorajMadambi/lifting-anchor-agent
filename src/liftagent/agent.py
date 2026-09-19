@@ -45,10 +45,14 @@ STATIC_ASSUMPTIONS: tuple[str, ...] = (
     "anchor against this panel's 180mm thickness, so beta=0 always applies here regardless.",
     "The POC does not perform continuous anchor-position optimisation: the placement policy is "
     "trial-at-0.207L then shift-to-CoG, with a single bounded 'move in' fallback (brief 3.5 step 11) "
-    "if that shifted position fails edge distance or axis spacing -- a closed-form feasibility check "
-    "against this anchor's own catalogue min_edge_mm/min_axis_mm, never a search or an optimiser. If no "
-    "such position exists, or another constraint (wall thickness, capacity) fails regardless, the "
-    "candidate fails and the next catalogue candidate is tried (brief 3.5 steps 5-11).",
+    "if that shifted position fails edge distance, axis spacing, or opening-void clearance -- a "
+    "closed-form feasibility check against this anchor's own catalogue min_edge_mm/min_axis_mm, never "
+    "a search or an optimiser. Anchor-capacity and reaction failures are never addressed by trying a "
+    "different spacing: the CoG-centered two-anchor statics model makes reactions invariant to "
+    "spacing, so only position-dependent checks can be affected by this fallback; capacity failures "
+    "are handled by trying the next catalogue candidate instead. If no feasible fallback position "
+    "exists, or another constraint (wall thickness, capacity) fails regardless, the candidate fails "
+    "and the next catalogue candidate is tried (brief 3.5 steps 5-11).",
     "Existing 'Wire Loop Box' cast-in proxies found in WC001.ifc are not lifting anchors (no matching "
     "row in the brief 3.3 catalogue) and are excluded from the engineering calculation.",
     "Opening voids were not extracted from WC001.ifc's raw faceted-BREP geometry (see ifc_geometry.py); "
@@ -120,7 +124,25 @@ def _mark_capacity_conditional(checks: list[CheckResult], reinforcement_check: C
     return updated
 
 
-POSITION_RELATED_CHECK_NAMES = ("edge_distance", "axis_spacing")
+# All three of these depend on x1/x2 (brief 3.3 edge/axis, 3.5 step 8 opening
+# clash) -- unlike reaction_nonnegative/axial_capacity, which are algebraically
+# invariant to spacing as long as the pair stays CoG-centered (see
+# DESIGN_NOTE.md "Bounded position iteration"), so only these three can ever
+# be fixed by trying a different placement of the SAME anchor.
+POSITION_DEPENDENT_CHECK_NAMES = ("edge_distance", "axis_spacing", "opening_void_clash")
+
+
+def _position_dependent_checks(tools: ToolBox, anchor, lo: float, hi: float, length_mm: float,
+                                thickness_mm: float, openings, height_mm: float) -> tuple[list[CheckResult], list[str]]:
+    """Every check whose PASS/FAIL depends on the candidate x1/x2, evaluated
+    together at one position -- used identically for the trial position and
+    the bounded 'move in' fallback, so both are judged by the same complete
+    set of position-dependent checks (not edge/axis alone)."""
+    checks = tools.check_edge_axis_wall(anchor, lo, hi, length_mm, thickness_mm)
+    checks.append(tools.check_opening_void_clash(lo, hi, openings, height_mm))
+    failed = [c.check_name for c in checks
+              if c.check_name in POSITION_DEPENDENT_CHECK_NAMES and c.state == CheckState.FAIL]
+    return checks, failed
 
 
 def _evaluate_candidate(tools: ToolBox, anchor_type: str, authoritative, concrete, handling_states,
@@ -135,28 +157,27 @@ def _evaluate_candidate(tools: ToolBox, anchor_type: str, authoritative, concret
     x1_trial, x2_trial = tools.shift_to_cog(x1_trial, x2_trial, length_mm, cog.x_mm)
     lo_trial, hi_trial = min(x1_trial, x2_trial), max(x1_trial, x2_trial)
 
-    # brief 3.5 step 7/11: enforce edge/axis/wall at the trial position first.
-    # If (and only if) edge distance or axis spacing is what fails, attempt the
-    # bounded "move in" search (step 11) before giving up on this candidate.
-    position_checks = tools.check_edge_axis_wall(anchor, lo_trial, hi_trial, length_mm, thickness_mm)
-    position_related_failed = [c.check_name for c in position_checks
-                                if c.check_name in POSITION_RELATED_CHECK_NAMES and c.state == CheckState.FAIL]
+    # brief 3.5 step 7/11: enforce edge/axis/opening-clash at the trial
+    # position first. If (and only if) any of those position-dependent
+    # checks fail, attempt the bounded "move in" search (step 11) -- at
+    # most one fallback position, never a search or optimiser -- before
+    # giving up on this candidate.
+    position_checks, trial_failed = _position_dependent_checks(
+        tools, anchor, lo_trial, hi_trial, length_mm, thickness_mm, authoritative.openings, height_mm)
 
     lo, hi = lo_trial, hi_trial
     position_iteration = PositionIterationResult(attempted=False)
 
-    if position_related_failed:
-        reason = (f"initial trial position (a=0.207L) fails {', '.join(position_related_failed)} "
-                  f"for {anchor.name}")
+    if trial_failed:
+        reason = f"initial trial position (a=0.207L) fails {', '.join(trial_failed)} for {anchor.name}"
         trial_attempt = PositionAttempt(x1_mm=lo_trial, x2_mm=hi_trial, result=CheckState.FAIL,
-                                         failed_checks=tuple(position_related_failed))
+                                         failed_checks=tuple(trial_failed))
         feasible = tools.find_feasible_inward_position(anchor, length_mm, cog.x_mm)
 
         if feasible is not None:
             new_lo, new_hi = feasible
-            new_checks = tools.check_edge_axis_wall(anchor, new_lo, new_hi, length_mm, thickness_mm)
-            still_failed = [c.check_name for c in new_checks
-                            if c.check_name in POSITION_RELATED_CHECK_NAMES and c.state == CheckState.FAIL]
+            new_checks, still_failed = _position_dependent_checks(
+                tools, anchor, new_lo, new_hi, length_mm, thickness_mm, authoritative.openings, height_mm)
             fallback_attempt = PositionAttempt(
                 x1_mm=new_lo, x2_mm=new_hi,
                 result=(CheckState.FAIL if still_failed else CheckState.PASS),
@@ -172,9 +193,9 @@ def _evaluate_candidate(tools: ToolBox, anchor_type: str, authoritative, concret
                 selected_x1_mm=(lo if not still_failed else None),
                 selected_x2_mm=(hi if not still_failed else None),
                 method=("bounded feasibility search: smallest symmetric inward move (from each end) "
-                        "satisfying this anchor's min_edge_mm, checked against min_axis_mm "
-                        "(brief 3.5 step 11 'move in'); not an optimiser -- at most one "
-                        "analytically-derived candidate position is tried."),
+                        "satisfying this anchor's min_edge_mm, checked against min_axis_mm and "
+                        "opening-void clearance (brief 3.5 step 11 'move in'); not an optimiser -- "
+                        "at most one analytically-derived candidate position is tried."),
             )
         else:
             position_iteration = PositionIterationResult(
@@ -182,13 +203,12 @@ def _evaluate_candidate(tools: ToolBox, anchor_type: str, authoritative, concret
                 initial_x1_mm=lo_trial, initial_x2_mm=hi_trial,
                 attempts=(trial_attempt,),
                 selected_x1_mm=None, selected_x2_mm=None,
-                method=("bounded feasibility search: no single position satisfies both this "
-                        "anchor's min_edge_mm and min_axis_mm simultaneously "
+                method=("bounded feasibility search: no single position satisfies min_edge_mm, "
+                        "min_axis_mm, and opening-void clearance simultaneously "
                         "(brief 3.5 step 11 'move in')."),
             )
 
     checks: list[CheckResult] = list(position_checks)
-    checks.append(tools.check_opening_void_clash(lo, hi, authoritative.openings, height_mm))
 
     rig = tools.decide_rig(anchor, thickness_mm)
     z = 1.0  # vertical slings -- see STATIC_ASSUMPTIONS

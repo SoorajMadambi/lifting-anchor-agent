@@ -1,13 +1,22 @@
 """Bounded 'move in' position iteration -- brief §3.5 step 11.
 
 Proves the §3.5 audit's identified gap is closed NARROWLY: when the trial
-position (a=0.207L, shifted to CoG) fails edge distance or axis spacing, the
-deterministic engineering core attempts exactly one analytically-derived
-inward position (engineering.find_feasible_inward_position) before giving up
-on that catalogue candidate -- not a general optimiser, not a loop, and
-never something the Reasoner can influence (it never sees a position at
-all). Catalogue-candidate iteration (trying the next anchor type) remains
+position (a=0.207L, shifted to CoG) fails any position-dependent check --
+edge distance, axis spacing, or opening-void clash -- the deterministic
+engineering core attempts exactly one analytically-derived inward position
+(engineering.find_feasible_inward_position) before giving up on that
+catalogue candidate -- not a general optimiser, not a loop, and never
+something the Reasoner can influence (it never sees a position at all).
+Catalogue-candidate iteration (trying the next anchor type) remains
 completely separate and untouched.
+
+A second, later F3 audit (see DESIGN_NOTE.md) established that
+reaction_nonnegative/axial_capacity are algebraically INVARIANT to spacing
+as long as the pair stays CoG-centered (which every placement here always
+is) -- so this bounded fallback is only ever able to affect the three
+position-dependent checks above, never capacity/reaction failures. TEST G/H
+below cover that widened trigger and pin the invariance as intended
+behaviour, not a gap.
 
 This is NOT about the Reasoner/LLM (see test_reasoner_security.py) and NOT
 about the general engineering formulas (see test_end_to_end.py) -- it's
@@ -20,8 +29,9 @@ import pytest
 from liftagent import catalogue, report
 from liftagent.agent import run_agent
 from liftagent.reasoner import EvilReasoner, MockReasoner
-from liftagent.schema import CheckState, SourceRole, Status
+from liftagent.schema import CheckState, Opening, SourceRole, Status
 from tests.conftest import make_geometry_source, make_production
+from tests.test_agent_workflow import _AlternateDeterministicReasoner
 from tests.test_end_to_end import _resolved_element, _run_resolved
 
 
@@ -225,3 +235,172 @@ def test_f_evil_reasoner_cannot_exploit_the_infeasible_search_path():
     result = run_agent(element, EvilReasoner(), reinforcement_confirmed=True)
     assert result.status == Status.REJECT
     assert result.resolved_candidate is None
+
+
+# --------------------------------------------------------------------------
+# TEST G -- F3 gap: opening-void clash must be able to trigger the fallback
+# --------------------------------------------------------------------------
+
+# L=4700mm, H=3000mm, t=180mm (matches the brief's WC001 dimensions). A
+# single opening reaching the top edge sits directly under where ARL-42's
+# trial position (a=0.207L, shifted to CoG) lands, but clear of where the
+# bounded "move in" fallback lands -- hand-verified against the actual
+# engineering functions (not asserted blind): trial lo=988.4mm sits inside
+# the opening's [800,1200]mm x-range; the fallback moves to lo=531.0mm,
+# clear of it, while edge_distance (500.0>=500) and axis_spacing both still
+# pass there.
+_OPENING_UNDER_TRIAL_POSITION = Opening(id="O1", x_mm=800.0, width_mm=400.0, sill_mm=2600.0, height_mm=400.0)
+
+
+def _run_with_opening_under_trial_position():
+    sources = (make_geometry_source(length_mm=4700.0, height_mm=3000.0, thickness_mm=180.0,
+                                     openings=(_OPENING_UNDER_TRIAL_POSITION,),
+                                     role=SourceRole.AUTHORITATIVE_DESIGN, name="approval_design"),)
+    element = _resolved_element(geometry_sources=sources)
+    return run_agent(element, MockReasoner(), reinforcement_confirmed=True)
+
+
+def test_g_opening_clash_at_trial_position_triggers_placement_fallback():
+    """Before this fix, opening_void_clash could never trigger the bounded
+    'move in' search (only edge_distance/axis_spacing could) -- a candidate
+    that cleared edge/axis but landed inside an opening was never retried.
+    This is the concrete F3 gap the second audit identified."""
+    result = _run_with_opening_under_trial_position()
+    candidate = result.resolved_candidate
+    assert candidate is not None, f"expected ACCEPT_PROVISIONAL, got {result.status}/{result.reason}"
+    assert candidate.anchor_type == "ARL-42"
+
+    pi = candidate.position_iteration
+    assert pi is not None
+    assert pi.attempted is True
+    assert len(pi.attempts) == 2                                # bounded: trial + exactly one fallback
+
+    trial_attempt, fallback_attempt = pi.attempts
+    assert trial_attempt.result == CheckState.FAIL
+    assert trial_attempt.failed_checks == ("opening_void_clash",)  # edge/axis passed at trial
+    assert fallback_attempt.result == CheckState.PASS
+    assert fallback_attempt.failed_checks == ()
+
+    # the fallback position was actually selected
+    assert (candidate.x1_mm, candidate.x2_mm) == (pi.selected_x1_mm, pi.selected_x2_mm)
+    assert (candidate.x1_mm, candidate.x2_mm) != (pi.initial_x1_mm, pi.initial_x2_mm)
+
+    # the final candidate proceeded through the normal downstream checks --
+    # every handling state has a capacity check tracing to catalogue.py.
+    axial_checks = [c for c in candidate.checks if c.check_name == "axial_capacity"]
+    assert axial_checks
+    valid_capacities = set(catalogue.get_anchor("ARL-42").capacity_kn.values())
+    assert all(c.capacity in valid_capacities for c in axial_checks)
+
+    # plumb is preserved at the selected position, same as the edge/axis case
+    assert (candidate.x1_mm + candidate.x2_mm) / 2 == pytest.approx(result.cog.x_mm, abs=0.01)
+
+    # only ONE opening_void_clash CheckResult survives on the final
+    # candidate (from the selected position) -- not two, even though it was
+    # evaluated twice internally.
+    clash_checks = [c for c in candidate.checks if c.check_name == "opening_void_clash"]
+    assert len(clash_checks) == 1
+    assert clash_checks[0].state == CheckState.PASS
+
+
+def test_g_opening_clash_search_is_deterministic():
+    r1 = _run_with_opening_under_trial_position()
+    r2 = _run_with_opening_under_trial_position()
+    assert r1.status == r2.status == Status.ACCEPT_PROVISIONAL
+    assert report.to_json_dict(r1) == report.to_json_dict(r2)
+
+
+# --------------------------------------------------------------------------
+# TEST H -- capacity/reaction failures never trigger placement iteration
+# (the CoG-centered two-anchor statics model makes reactions invariant to
+# spacing, so this is intentional, not a gap -- see DESIGN_NOTE.md)
+# --------------------------------------------------------------------------
+
+def test_h_capacity_only_failure_does_not_trigger_a_placement_fallback():
+    """L=6000mm/t=220mm (the existing ARL-42-fails-on-capacity fixture, TEST
+    E): ARL-42's trial position clears every position-dependent check
+    (edge/axis/opening) but fails axial_capacity outright. Confirm NO
+    position_search was ever logged for ARL-42 -- the fallback is never
+    invoked for a check it structurally cannot fix."""
+    result = _run_at_length(6000.0, thickness_mm=220.0)
+    assert result.status == Status.ACCEPT_PROVISIONAL
+    assert result.resolved_candidate.anchor_type == "ARL-52"  # ARL-42 was tried and failed first
+
+    arl42_capacity_fails = [t for t in result.rule_trace
+                             if t.step.startswith("capacity_") and t.result == "FAIL"]
+    assert arl42_capacity_fails  # confirms ARL-42 genuinely failed on capacity, not geometry
+
+    arl42_position_search = [t for t in result.rule_trace
+                              if t.step == "position_search" and t.data.get("anchor") == "ARL-42"]
+    assert arl42_position_search == []  # the fallback was never even attempted for ARL-42
+
+
+# --------------------------------------------------------------------------
+# TEST I -- the bounded fallback never exceeds two placement attempts per
+# anchor candidate, across every scenario in this file
+# --------------------------------------------------------------------------
+
+def test_i_no_anchor_candidate_ever_generates_more_than_two_placement_attempts():
+    scenarios = [
+        _run_at_length(1200.0),                          # TEST A: geometry-only fallback (edge/axis)
+        _run_at_length(800.0),                            # TEST F: infeasible fallback
+        _run_with_opening_under_trial_position(),          # TEST G: opening-clash fallback
+        _run_at_length(6000.0, thickness_mm=220.0),        # TEST H: capacity-only, no fallback at all
+    ]
+    for result in scenarios:
+        attempts_by_anchor: dict[str, int] = {}
+        for entry in result.rule_trace:
+            if entry.step == "edge_distance":
+                anchor = entry.data.get("anchor")
+                attempts_by_anchor[anchor] = attempts_by_anchor.get(anchor, 0) + 1
+        assert attempts_by_anchor, "expected at least one edge_distance trace entry"
+        assert all(count <= 2 for count in attempts_by_anchor.values()), attempts_by_anchor
+
+
+# --------------------------------------------------------------------------
+# TEST J -- placement iteration is reasoner-independent (determinism
+# boundary): the Reasoner is consulted only to pick an anchor TYPE
+# (reasoner.py); position generation, feasibility checks, and selection
+# live entirely in engineering.py/agent.py and never consult it. For a
+# given chosen anchor, the entire placement-iteration record -- ordered
+# attempts, selected position, and the full structured report -- must be
+# byte-identical no matter which Reasoner implementation chose it.
+# --------------------------------------------------------------------------
+
+def test_j_placement_iteration_is_identical_across_independent_reasoners():
+    """MockReasoner, EvilReasoner (whose hallucinated anchor is rejected by
+    validator.py and falls back to the same deterministic try-order), and
+    _AlternateDeterministicReasoner (test_agent_workflow.py -- an
+    independent implementation with unrelated wording) all resolve to the
+    same first anchor type for both fixtures below. Covers both fallback
+    triggers: geometry-only (1200mm, TEST A) and opening-clash (TEST G)."""
+    element_geometry_fallback = _resolved_element(geometry_sources=(
+        make_geometry_source(length_mm=1200.0, height_mm=3000.0, thickness_mm=180.0,
+                              role=SourceRole.AUTHORITATIVE_DESIGN, name="approval_design"),
+    ))
+    element_opening_fallback = _resolved_element(geometry_sources=(
+        make_geometry_source(length_mm=4700.0, height_mm=3000.0, thickness_mm=180.0,
+                              openings=(_OPENING_UNDER_TRIAL_POSITION,),
+                              role=SourceRole.AUTHORITATIVE_DESIGN, name="approval_design"),
+    ))
+
+    for element in (element_geometry_fallback, element_opening_fallback):
+        a = run_agent(element, MockReasoner(), reinforcement_confirmed=True)
+        b = run_agent(element, EvilReasoner(), reinforcement_confirmed=True)
+        c = run_agent(element, _AlternateDeterministicReasoner(), reinforcement_confirmed=True)
+
+        assert a.status == Status.ACCEPT_PROVISIONAL
+        assert a.resolved_candidate.anchor_type == b.resolved_candidate.anchor_type == \
+               c.resolved_candidate.anchor_type
+
+        # the placement-iteration record itself -- ordered attempts, selected
+        # position -- not just the final engineering numbers
+        assert a.resolved_candidate.position_iteration == b.resolved_candidate.position_iteration
+        assert a.resolved_candidate.position_iteration == c.resolved_candidate.position_iteration
+
+        # the full structured report is byte-identical -- AgentResult carries
+        # no Reasoner-authored text at all (explain() is a separate, optional
+        # call never folded into the report; see test_11g in
+        # test_agent_workflow.py for the same property on the wider result).
+        report_a, report_b, report_c = report.to_json_dict(a), report.to_json_dict(b), report.to_json_dict(c)
+        assert report_a == report_b == report_c
