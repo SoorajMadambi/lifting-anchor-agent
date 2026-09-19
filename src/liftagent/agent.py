@@ -46,13 +46,16 @@ STATIC_ASSUMPTIONS: tuple[str, ...] = (
     "The POC does not perform continuous anchor-position optimisation: the placement policy is "
     "trial-at-0.207L then shift-to-CoG, with a single bounded 'move in' fallback (brief 3.5 step 11) "
     "if that shifted position fails edge distance, axis spacing, or opening-void clearance -- a "
-    "closed-form feasibility check against this anchor's own catalogue min_edge_mm/min_axis_mm, never "
-    "a search or an optimiser. Anchor-capacity and reaction failures are never addressed by trying a "
-    "different spacing: the CoG-centered two-anchor statics model makes reactions invariant to "
-    "spacing, so only position-dependent checks can be affected by this fallback; capacity failures "
-    "are handled by trying the next catalogue candidate instead. If no feasible fallback position "
-    "exists, or another constraint (wall thickness, capacity) fails regardless, the candidate fails "
-    "and the next catalogue candidate is tried (brief 3.5 steps 5-11).",
+    "closed-form interval derivation (the edge/axis-feasible range for the inward offset, minus every "
+    "top-edge-reaching opening's blocked sub-interval) against this anchor's own catalogue "
+    "min_edge_mm/min_axis_mm and the panel's openings, never a stepped search or an optimiser; the "
+    "resulting candidate is always re-verified against the real, unchanged checks before being used. "
+    "Anchor-capacity and reaction failures are never addressed by trying a different spacing: the "
+    "CoG-centered two-anchor statics model makes reactions invariant to spacing, so only "
+    "position-dependent checks can be affected by this fallback; capacity failures are handled by "
+    "trying the next catalogue candidate instead. If no feasible fallback position exists, or another "
+    "constraint (wall thickness, capacity) fails regardless, the candidate fails and the next "
+    "catalogue candidate is tried (brief 3.5 steps 5-11).",
     "Existing 'Wire Loop Box' cast-in proxies found in WC001.ifc are not lifting anchors (no matching "
     "row in the brief 3.3 catalogue) and are excluded from the engineering calculation.",
     "Opening voids were not extracted from WC001.ifc's raw faceted-BREP geometry (see ifc_geometry.py); "
@@ -172,7 +175,8 @@ def _evaluate_candidate(tools: ToolBox, anchor_type: str, authoritative, concret
         reason = f"initial trial position (a=0.207L) fails {', '.join(trial_failed)} for {anchor.name}"
         trial_attempt = PositionAttempt(x1_mm=lo_trial, x2_mm=hi_trial, result=CheckState.FAIL,
                                          failed_checks=tuple(trial_failed))
-        feasible = tools.find_feasible_inward_position(anchor, length_mm, cog.x_mm)
+        feasible = tools.find_feasible_inward_position(
+            anchor, length_mm, cog.x_mm, authoritative.openings, height_mm)
 
         if feasible is not None:
             new_lo, new_hi = feasible
@@ -192,10 +196,12 @@ def _evaluate_candidate(tools: ToolBox, anchor_type: str, authoritative, concret
                 attempts=(trial_attempt, fallback_attempt),
                 selected_x1_mm=(lo if not still_failed else None),
                 selected_x2_mm=(hi if not still_failed else None),
-                method=("bounded feasibility search: smallest symmetric inward move (from each end) "
-                        "satisfying this anchor's min_edge_mm, checked against min_axis_mm and "
-                        "opening-void clearance (brief 3.5 step 11 'move in'); not an optimiser -- "
-                        "at most one analytically-derived candidate position is tried."),
+                method=("closed-form interval search: derives the full edge/axis-feasible interval "
+                        "for the inward offset, subtracts every top-edge-reaching opening's "
+                        "blocked sub-interval(s), and selects the smallest remaining feasible "
+                        "position (brief 3.5 step 11 'move in'); not an optimiser or a stepped "
+                        "search -- still at most one candidate position is tried, and it is always "
+                        "re-verified against the real, unchanged checks above."),
             )
         else:
             position_iteration = PositionIterationResult(
@@ -203,8 +209,8 @@ def _evaluate_candidate(tools: ToolBox, anchor_type: str, authoritative, concret
                 initial_x1_mm=lo_trial, initial_x2_mm=hi_trial,
                 attempts=(trial_attempt,),
                 selected_x1_mm=None, selected_x2_mm=None,
-                method=("bounded feasibility search: no single position satisfies min_edge_mm, "
-                        "min_axis_mm, and opening-void clearance simultaneously "
+                method=("closed-form interval search: no position satisfies min_edge_mm, "
+                        "min_axis_mm, and every opening's clearance simultaneously "
                         "(brief 3.5 step 11 'move in')."),
             )
 

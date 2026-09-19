@@ -18,6 +18,18 @@ position-dependent checks above, never capacity/reaction failures. TEST G/H
 below cover that widened trigger and pin the invariance as intended
 behaviour, not a gap.
 
+A THIRD audit found that even the widened fallback still returned only the
+minimum edge/axis-feasible position, with no opening-awareness at all --
+so a fallback that itself landed inside an opening was rejected outright,
+even when other feasible positions existed further along the same
+edge/axis-feasible range. `find_feasible_inward_position()` now derives
+that full feasible range and an opening-aware position within it
+analytically (closed-form interval math, still no search/optimiser, still
+at most one candidate position per anchor) -- see
+test_engineering.py's `test_interval_*` tests for the formula-level proof,
+and TEST K below for the same fix exercised end-to-end through a real
+catalogue anchor and the full agent loop.
+
 This is NOT about the Reasoner/LLM (see test_reasoner_security.py) and NOT
 about the general engineering formulas (see test_end_to_end.py) -- it's
 specifically about the new position-search mechanism itself.
@@ -404,3 +416,85 @@ def test_j_placement_iteration_is_identical_across_independent_reasoners():
         # test_agent_workflow.py for the same property on the wider result).
         report_a, report_b, report_c = report.to_json_dict(a), report.to_json_dict(b), report.to_json_dict(c)
         assert report_a == report_b == report_c
+
+
+# --------------------------------------------------------------------------
+# TEST K -- the opening-aware interval fix, exercised end-to-end (3rd F3
+# audit): a real catalogue anchor (ARL-42) whose SINGLE bounded fallback
+# position would itself land inside an opening under the OLD single-point
+# formula, but the interval search finds a further, opening-clear position
+# within the same edge/axis-feasible range -- still exactly one fallback
+# attempt at the agent level, still re-verified by the real checks.
+# --------------------------------------------------------------------------
+
+# L=4700mm/H=3000mm/t=180mm (WC001 scale). O1 makes ARL-42's TRIAL position
+# clash (same opening as TEST G); O2 is a second, small opening placed
+# exactly straddling the OLD fallback formula's answer (hand-verified
+# against the real engineering functions, not asserted blind) -- forcing
+# the interval search to find a position further along the feasible range.
+_OPENING_BLOCKS_TRIAL = Opening(id="O1", x_mm=800.0, width_mm=400.0, sill_mm=2600.0, height_mm=400.0)
+_OPENING_BLOCKS_OLD_FALLBACK = Opening(id="O2", x_mm=505.49497847919656, width_mm=20.0,
+                                        sill_mm=2600.0, height_mm=400.0)
+
+
+def _run_with_opening_blocking_both_trial_and_old_fallback():
+    sources = (make_geometry_source(length_mm=4700.0, height_mm=3000.0, thickness_mm=180.0,
+                                     openings=(_OPENING_BLOCKS_TRIAL, _OPENING_BLOCKS_OLD_FALLBACK),
+                                     role=SourceRole.AUTHORITATIVE_DESIGN, name="approval_design"),)
+    element = _resolved_element(geometry_sources=sources)
+    return run_agent(element, MockReasoner(), reinforcement_confirmed=True)
+
+
+def test_k_interval_search_finds_a_position_past_the_old_single_point_fallback():
+    result = _run_with_opening_blocking_both_trial_and_old_fallback()
+    candidate = result.resolved_candidate
+    assert candidate is not None, f"expected ACCEPT_PROVISIONAL, got {result.status}/{result.reason}"
+    assert candidate.anchor_type == "ARL-42"
+
+    pi = candidate.position_iteration
+    assert pi is not None
+    assert pi.attempted is True
+    assert len(pi.attempts) == 2  # still bounded: trial + exactly one (now opening-aware) fallback
+
+    trial_attempt, fallback_attempt = pi.attempts
+    assert trial_attempt.result == CheckState.FAIL
+    assert fallback_attempt.result == CheckState.PASS
+    assert fallback_attempt.failed_checks == ()
+    # the fallback position is NOT the old single-point answer (515.49...) --
+    # the interval search moved past the second opening too
+    assert fallback_attempt.x1_mm > 525.0
+
+    # re-verified by the real, unchanged checks -- never trusted from the
+    # interval math alone
+    edge_check = next(c for c in candidate.checks if c.check_name == "edge_distance")
+    axis_check = next(c for c in candidate.checks if c.check_name == "axis_spacing")
+    clash_check = next(c for c in candidate.checks if c.check_name == "opening_void_clash")
+    assert edge_check.state == axis_check.state == clash_check.state == CheckState.PASS
+
+    # plumb preserved at the selected position
+    assert (candidate.x1_mm + candidate.x2_mm) / 2 == pytest.approx(result.cog.x_mm, abs=1e-6)
+
+
+def test_k_interval_search_is_identical_across_independent_reasoners():
+    """Same reasoner-independence property as TEST J, specifically for the
+    interval-derived (not single-point) fallback."""
+    element = _resolved_element(geometry_sources=(
+        make_geometry_source(length_mm=4700.0, height_mm=3000.0, thickness_mm=180.0,
+                              openings=(_OPENING_BLOCKS_TRIAL, _OPENING_BLOCKS_OLD_FALLBACK),
+                              role=SourceRole.AUTHORITATIVE_DESIGN, name="approval_design"),
+    ))
+    a = run_agent(element, MockReasoner(), reinforcement_confirmed=True)
+    b = run_agent(element, EvilReasoner(), reinforcement_confirmed=True)
+    c = run_agent(element, _AlternateDeterministicReasoner(), reinforcement_confirmed=True)
+
+    assert a.status == Status.ACCEPT_PROVISIONAL
+    assert a.resolved_candidate.position_iteration == b.resolved_candidate.position_iteration
+    assert a.resolved_candidate.position_iteration == c.resolved_candidate.position_iteration
+    assert report.to_json_dict(a) == report.to_json_dict(b) == report.to_json_dict(c)
+
+
+def test_k_interval_search_result_is_deterministic_across_repeated_runs():
+    r1 = _run_with_opening_blocking_both_trial_and_old_fallback()
+    r2 = _run_with_opening_blocking_both_trial_and_old_fallback()
+    assert r1.status == r2.status == Status.ACCEPT_PROVISIONAL
+    assert report.to_json_dict(r1) == report.to_json_dict(r2)

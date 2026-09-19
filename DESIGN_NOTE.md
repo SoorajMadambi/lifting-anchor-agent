@@ -83,29 +83,32 @@ concrete to inspect -- but that calculation is written only to `illustrative_can
 ## Bounded position iteration ("move in")
 
 A §3.5 audit found one gap: trial `a=0.207L` shifted to the CoG (steps 5-6) simply failed the
-candidate if it violated a position-dependent constraint, never attempting step 11's "move in"
-remedy. Fix, narrowly scoped: `engineering.find_feasible_inward_position()` derives the smallest
-symmetric inward move clearing the failing anchor's own `min_edge_mm`, checked against its
-`min_axis_mm` -- both bounds from `catalogue.py`, nothing invented. Moving both anchors in by a
-constant amount can't move the pair's midpoint off the CoG (the constant cancels), so plumb holds
-by construction; reactions are still recomputed via the existing `compute_reactions()`, never
-assumed. A closed-form check for **at most one** fallback position (two placements total per
-anchor), not a search or optimiser -- if none exists, the candidate fails as before and the next
-catalogue anchor is tried. The Reasoner never sees a position; this is entirely internal to the
-engineering core. `Candidate.position_iteration` records what was attempted, what failed, and what
-was selected, for the same auditability as every other decision. `Status.ITERATE` remains
-structurally unreachable as a final status (intentionally -- this iteration is internal to one
-candidate's evaluation, not an externally meaningful state).
+candidate if it violated a position-dependent constraint (`edge_distance`, `axis_spacing`, or --
+since a second audit -- `opening_void_clash`), never attempting step 11's "move in" remedy.
+`engineering.find_feasible_inward_position()` derives the smallest feasible x1 satisfying the
+anchor's `min_edge_mm`/`min_axis_mm` (from `catalogue.py`) with every top-edge-reaching opening's
+x-span excluded from that range too (a third audit found the fallback itself was opening-blind,
+returning its answer even when that exact point sat inside an opening). x2 is always computed as
+`2*cog_x_mm - x1`, never independently, so plumb (`(x1+x2)/2 == cog_x_mm`) holds **by
+construction**; `compute_reactions()` still re-derives reactions, never assumed. Still a single
+closed-form derivation of **at most one** fallback position (two placements total per anchor), not
+a search or optimiser -- if none exists, the candidate fails and the next catalogue anchor is
+tried. Where the result lands exactly on an opening's inclusive boundary, `math.nextafter()` picks
+the nearest strictly-clear representable float -- a numerical-correctness technique only, no
+physical clearance asserted -- applied to whichever coordinate (x1 or x2) the opening actually
+constrains, never round-tripped through the other (that conversion can silently lose the nudge to
+floating-point rounding, verified empirically). The candidate is never trusted directly: the real
+`check_edge_axis_wall()`/`check_opening_void_clash()` always re-verify it, failing closed on any
+residual clash. The Reasoner never sees a position -- entirely internal to the engineering core.
+`Candidate.position_iteration` records what was attempted/failed/selected, for the same
+auditability as every other decision. `Status.ITERATE` remains structurally unreachable as a final
+status (intentionally -- internal to one candidate's evaluation, not an externally meaningful
+state).
 
-**What can trigger the fallback, and what can't.** A second F3 audit asked whether a candidate
-failing a *later* check (e.g. capacity) should also retry at a different spacing. The trigger is
-every check that actually depends on `x1`/`x2`: `edge_distance`, `axis_spacing`, and (since this
-audit) `opening_void_clash` -- an anchor clearing edge/axis but landing inside an opening now
-retries too. Capacity and `reaction_nonnegative` deliberately do NOT trigger it:
-`shift_to_cog()`/`find_feasible_inward_position()` force `(x1+x2)/2 == cog_x_mm` exactly, so
-`compute_reactions()` reduces to `r1 == r2 == F_total/2` regardless of spacing -- a capacity
-failure is never a placement problem for the same anchor; it is resolved the existing way, by
-trying the next catalogue candidate.
+Capacity and `reaction_nonnegative` deliberately never trigger this fallback: since x2 is always
+`2*cog_x_mm - x1`, `compute_reactions()` reduces to `r1 == r2 == F_total/2` regardless of spacing --
+a capacity failure is never a placement problem for the same anchor, and is resolved the existing
+way, by trying the next catalogue candidate.
 
 ## Self-weight: derived, not copied from the figure
 

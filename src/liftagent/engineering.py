@@ -280,42 +280,107 @@ def check_edge_axis_wall(anchor: AnchorType, x1_mm: float, x2_mm: float,
     return results
 
 
-def find_feasible_inward_position(anchor: AnchorType, length_mm: float, cog_x_mm: float) -> tuple[float, float] | None:
+def find_feasible_inward_position(anchor: AnchorType, length_mm: float, cog_x_mm: float,
+                                   openings: tuple[Opening, ...], height_mm: float) -> tuple[float, float] | None:
     """Bounded deterministic 'move in' search -- brief 3.5 step 11's "move in"
-    remedy, and nothing more. NOT an optimiser: this derives at most ONE
-    analytically-computed candidate position, never a loop or a step-size
-    search. It is the smallest symmetric inward move (from each end, before
-    the existing CoG shift) that satisfies this anchor's own min_edge_mm,
-    checked against the same anchor's min_axis_mm. Both bounds come straight
-    from catalogue.py; nothing is invented.
+    remedy, and nothing more. NOT an optimiser and NOT a stepped/arbitrary
+    search: this analytically derives the smallest feasible x1 (the
+    edge/axis-feasible interval for the inward offset, with every
+    top-edge-reaching opening's blocked sub-range removed) and its exact
+    CoG-symmetric partner x2 -- the same "closest to the edge" bias as
+    before, just aware of openings too. min_edge_mm/min_axis_mm come
+    straight from catalogue.py; opening bounds come straight from the
+    Opening dataclass; nothing is invented. When no opening affects the
+    feasible interval, this reduces to exactly the prior single-point
+    answer (x1 = min_edge_mm + |delta| + delta).
 
-    Why plumb is preserved by construction: within the brief's placement
-    family (trial position at offset `a` from each end, then shifted by the
-    fixed CoG delta via shift_to_cog()), the anchor pair's MIDPOINT is always
-    exactly cog_x_mm, for ANY `a` -- shift_to_cog() adds the identical delta
-    to both x1 and x2, so varying `a` alone can never move the midpoint off
-    the CoG. Every position this function can return is therefore still
-    exactly plumb; the caller re-derives reactions via the normal
+    Why plumb is preserved by construction: x2 is always computed as
+    `2*cog_x_mm - x1`, never independently -- so the pair's MIDPOINT is
+    always exactly cog_x_mm by construction, for any x1 this function
+    produces. The caller re-derives reactions via the normal
     compute_reactions() call to confirm this (never assumed, never a 50/50
     split), exactly as for the original trial position.
 
-    Returns the new (x1_mm, x2_mm) if a single position clears both
-    constraints, else None. Does NOT check min_wall_axial or capacity --
-    neither depends on position, so the caller must still re-check them
-    (a bigger anchor's own min_wall_axial_mm may still fail regardless of
-    where it sits; that failure is not fixable by moving anything).
+    Floating-point boundary handling -- WHY THIS WORKS IN COORDINATE SPACE,
+    NOT OFFSET SPACE: since check_opening_void_clash()'s x-overlap test is
+    inclusive (`<=`) on both ends, the feasible region is open immediately
+    past a blocking opening -- there is no real-number smallest value
+    there, so `math.nextafter(boundary, math.inf/-math.inf)` is used to
+    select the smallest strictly-clear representable float. This is a
+    NUMERICAL boundary technique only -- it asserts no physical
+    construction clearance from the opening, and no such tolerance value is
+    invented or reused from elsewhere in this codebase (see DESIGN_NOTE.md).
+    Critically, the nudge is always applied directly to whichever
+    coordinate (x1 or x2) the clashing opening actually constrains, and the
+    OTHER coordinate is always freshly recomputed as `2*cog_x_mm -
+    (that coordinate)` -- never round-tripped through an intermediate
+    offset. Converting a tiny nudge on the SMALLER-magnitude side (e.g. x1)
+    through a large-magnitude subtraction (e.g. length_mm - x1) can lose it
+    entirely to floating-point rounding (verified empirically); nudging
+    whichever coordinate is actually being checked, and only ever deriving
+    the other one from it, avoids that loss.
+
+    Returns the new (x1_mm, x2_mm) if a feasible position remains after
+    accounting for min_edge_mm, min_axis_mm, and every opening, else None.
+    Does NOT check min_wall_axial or capacity -- neither depends on
+    position (see DESIGN_NOTE.md's capacity-invariance note), so the caller
+    must still re-check them. This function's result is ONLY a candidate --
+    the caller MUST re-verify it with the real, unchanged
+    check_edge_axis_wall()/check_opening_void_clash() before accepting it;
+    this analytical derivation is never itself trusted as the final source
+    of feasibility. If floating-point propagation ever left a residual
+    clash despite the handling above, the caller's mandatory re-check
+    catches it and the candidate fails closed -- no further retry or
+    invented tolerance is introduced here.
     """
     delta = cog_x_mm - length_mm / 2.0
-    a_required = anchor.min_edge_mm + abs(delta)              # smallest inward move clearing min_edge_mm
-    a_axis_ceiling = (length_mm - anchor.min_axis_mm) / 2.0    # largest inward move still clearing min_axis_mm
+    a_min = anchor.min_edge_mm + abs(delta)                # smallest inward move clearing min_edge_mm
+    a_max = (length_mm - anchor.min_axis_mm) / 2.0          # largest inward move still clearing min_axis_mm
 
-    if a_required > a_axis_ceiling:
+    if a_min > a_max:
         return None  # no single position clears both constraints for this anchor
-    if a_required >= length_mm / 2.0:
+    if a_min >= length_mm / 2.0:
         return None  # would push anchors past the panel midpoint -- not a valid inward move
 
-    x1 = a_required + delta
-    x2 = (length_mm - a_required) + delta
+    relevant_openings = [o for o in openings
+                          if o.width_mm > 0 and o.height_mm > 0
+                          and (o.sill_mm + o.height_mm) >= height_mm]
+    # Malformed openings (non-positive width/height) contribute no interval
+    # here -- they cannot be solved for a meaningful x-range -- and are
+    # instead caught unconditionally by check_opening_void_clash()'s own
+    # conservative-FAIL path when the caller re-verifies the selected
+    # position; a position generated here can never make that FAIL go away.
+
+    x1 = a_min + delta
+    x1_ceiling = a_max + delta
+
+    # Re-check every opening until a full pass changes nothing, or until a
+    # fixed, input-size-bounded number of passes is exhausted -- never an
+    # open-ended/stepped search. x1 only ever increases across escapes (each
+    # opening's blocked range is finite), which guarantees termination
+    # within, at most, one pass per opening.
+    changed = True
+    passes = 0
+    max_passes = 2 * len(relevant_openings) + 1
+    while changed and passes <= max_passes:
+        changed = False
+        passes += 1
+        for o in relevant_openings:
+            lo_o, hi_o = o.x_mm, o.x_mm + o.width_mm
+            if lo_o <= x1 <= hi_o:
+                x1 = math.nextafter(hi_o, math.inf)
+                changed = True
+                continue
+            x2 = 2.0 * cog_x_mm - x1
+            if lo_o <= x2 <= hi_o:
+                x2 = math.nextafter(lo_o, -math.inf)
+                x1 = 2.0 * cog_x_mm - x2
+                changed = True
+
+    if x1 > x1_ceiling:
+        return None  # every remaining position is either opening-blocked or past the axis-spacing bound
+
+    x2 = 2.0 * cog_x_mm - x1
     return x1, x2
 
 

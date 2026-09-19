@@ -19,10 +19,12 @@ fully deterministic and offline; `LLMReasoner` is optional and only activates if
 **Two independent, separate iteration mechanisms exist, neither touched by the Reasoner:**
 1. **Bounded deterministic design iteration** -- if the trial anchor position (0.207L, shifted to
    the centre of gravity) fails minimum edge distance, axis spacing, or opening-void clearance, the
-   engineering core attempts exactly one analytically-derived "move in" position (from the anchor's
-   own catalogue limits) before giving up on that candidate. Not a search or optimiser -- and never
-   triggered by a capacity/reaction failure, since reactions are invariant to spacing as long as the
-   pair stays CoG-centered (always true here) -- see `DESIGN_NOTE.md`.
+   engineering core derives, in closed form, the smallest feasible position that also clears every
+   opening in the panel (its CoG-symmetric partner coordinate is always derived, never assumed) --
+   still exactly one fallback attempt per candidate, re-verified by the real checks before use. Not
+   a search or optimiser -- and never triggered by a capacity/reaction failure, since reactions are
+   invariant to spacing as long as the pair stays CoG-centered (always true here) -- see
+   `DESIGN_NOTE.md`.
 2. **Catalogue candidate iteration** -- if a candidate still fails (position iteration included),
    the next permitted anchor type is tried, in a fixed deterministic order.
 
@@ -110,13 +112,14 @@ python -m liftagent run data/wc001.json --reinforcement-confirmed true
 pytest -q
 ```
 
-**221 tests**, covering:
+**238 tests**, covering:
 
 - deterministic engineering: self-weight, CoG, equilibrium/reaction calculations, trial
-  placement + CoG shift, catalogue capacity lookups, utilisation, and the governing check
-  (`test_engineering.py`, `test_end_to_end.py`)
+  placement + CoG shift, catalogue capacity lookups, utilisation, the governing check, and the
+  closed-form opening-aware feasible-interval search (`test_engineering.py`, `test_end_to_end.py`)
 - the bounded "move in" position-iteration fallback -- including the edge/axis case that
-  motivated it, an opening-void-clash case, proof it's skipped when not needed, proof a
+  motivated it, an opening-void-clash case, an opening-aware-interval case exercised end-to-end
+  through a real catalogue anchor, proof it's skipped when not needed, proof a
   capacity-only failure never triggers it, proof it can't bypass hard stops, determinism, and
   proof it doesn't interfere with catalogue candidate iteration (`test_position_iteration.py`)
 - geometry conflict handling and provenance -- WC001's real approval-vs-IFC disagreement, and
