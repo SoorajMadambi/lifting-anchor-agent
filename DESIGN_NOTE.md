@@ -143,12 +143,16 @@ number; that boundary is what this whole design enforces and tests against.
 ## POC-grade vs production-grade
 
 **POC:** two-anchor lifts only; no continuous anchor-position optimisation -- only the single
-bounded "move in" fallback described above, never a general search; opening-void clash is
-checked, but exact 3D reinforcement/trimmer clash is always
-`UNKNOWN` and correctly forces HOLD rather than a fabricated PASS; vertical-sling assumption
-(z=1.0), moot for WC001 since every catalogue anchor's transverse min-wall exceeds this panel's
-180mm thickness; IFC opening extraction not attempted (would need polygon reconstruction from
-tessellated facets).
+bounded "move in" fallback described above, never a general search; opening-void clash is checked
+geometrically (preventing an anchor from landing inside a modeled opening's void), but detailed 3D
+clash with opening trimmers, cast-ins, and supplementary reinforcement is not modeled in this POC
+and remains outside the deterministic geometry checks -- must be verified separately before
+release, with no physical trimmer clearance assumed since the assessment specifies no such value
+(`math.nextafter()`, described above, is purely numerical, never a construction-clearance
+allowance) -- the agent never signs off or auto-releases regardless (`requires_human_signoff` is
+always `True`, brief hard stop 12); vertical-sling assumption (z=1.0), moot for WC001 since every
+catalogue anchor's transverse min-wall exceeds this panel's 180mm thickness; IFC opening
+extraction not attempted (would need polygon reconstruction from tessellated facets).
 
 **Production next steps:** 4-point lifts with a load-balancing traverse (n > 2); real
 reinforcement/cast-in geometry for a genuine 3D clash check; a certified anchor catalogue instead
