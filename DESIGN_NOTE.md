@@ -80,6 +80,31 @@ Any disagreement forces `status = HOLD, selected_geometry = null`. The engineeri
 concrete to inspect -- but that calculation is written only to `illustrative_candidate`, never
 `resolved_candidate`, and both the JSON and SVG label it "not a resolved placement."
 
+## IFC opening extraction: input-format limitation, not a capability gap
+
+`WC001.ifc` contains 11 `IfcBuildingElementProxy` entities and zero `IfcWall`, `IfcOpeningElement`,
+`IfcRelVoidsElement`, `IfcDoor`, or `IfcWindow` entities (confirmed via `ifcopenshell`) -- the panel
+is raw, unstructured proxy geometry, not a wall with explicit voids, so `ifc_geometry.py` has no
+`IfcRelVoidsElement` relationship to trace and no `IfcOpeningElement` to measure. Opening
+extraction is possible when the IFC provides explicit wall/opening semantics; the supplied WC001
+export does not, so opening information remains `UNKNOWN` for this source -- not a claim that the
+panel has zero physical openings, only that opening geometry can't be deterministically recovered
+from this file's current representation. Per the existing "never fabricate, report UNKNOWN"
+invariant, the agent does not infer openings from the proxy's raw facets; `ifc_geometry`'s
+length/height/thickness bounding-box extraction is unaffected. `UNKNOWN` opening information is
+excluded from opening-count conflict comparisons (`ingest.py`) and, where a genuine mandatory
+input remains unresolved, still contributes to the existing HOLD/RFI outcome -- fail-closed, never
+assuming zero openings.
+
+A separate wall-modeled IFC2x3 file (`IfcWallStandardCase` + `IfcOpeningElement` +
+`IfcRelVoidsElement`, `IfcDoor`/`IfcWindow` via `IfcRelFillsElement`) was investigated separately
+and confirmed deterministic opening extraction -- wall-local x/width/sill/height via
+`ifcopenshell`'s geometry kernel and coordinate transforms -- is technically feasible when an IFC
+does carry that structure. This is a known input-format limitation, not evidence that IFC opening
+extraction is fundamentally impossible; supporting wall-modeled IFC input is a scoped future
+enhancement (see "Production next steps" below), intentionally outside this MVP since WC001.ifc
+itself has no such structure to extract from.
+
 ## Bounded position iteration ("move in")
 
 A §3.5 audit found one gap: trial `a=0.207L` shifted to the CoG (steps 5-6) simply failed the
@@ -152,7 +177,8 @@ release, with no physical trimmer clearance assumed since the assessment specifi
 allowance) -- the agent never signs off or auto-releases regardless (`requires_human_signoff` is
 always `True`, brief hard stop 12); vertical-sling assumption (z=1.0), moot for WC001 since every
 catalogue anchor's transverse min-wall exceeds this panel's 180mm thickness; IFC opening
-extraction not attempted (would need polygon reconstruction from tessellated facets).
+extraction not implemented for WC001.ifc's proxy representation (see "IFC opening extraction"
+above) -- confirmed feasible for wall-modeled IFC input, not for this file's structure.
 
 **Production next steps:** 4-point lifts with a load-balancing traverse (n > 2); real
 reinforcement/cast-in geometry for a genuine 3D clash check; a certified anchor catalogue instead

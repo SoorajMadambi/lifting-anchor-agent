@@ -1,0 +1,249 @@
+<title>Lifting-anchor agent pipeline</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#faf9f6; --surface:#ffffff; --surface-2:#f2efe7; --surface-3:#eae6da;
+  --ink:#1f2933; --ink-2:#52606d; --ink-3:#7b8794;
+  --border:#d2d6dc; --border-2:#bcc3cc;
+  --accent:#1b4965; --accent-ink:#0c2c3f; --accent-bg:#e6f0f6;
+  --ai:#c0392b; --ai-ink:#7c231a; --ai-bg:#fbeded;
+  --ok:#2f6b3f; --ok-bg:#edf5ef;
+  --font-display:'Source Serif 4', Georgia, serif;
+  --font-body:'IBM Plex Sans', -apple-system, sans-serif;
+  --font-mono:'IBM Plex Mono', Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14181d; --surface:#1c2229; --surface-2:#232a33; --surface-3:#2b333d;
+    --ink:#e8ecf0; --ink-2:#a7b0ba; --ink-3:#7b8794;
+    --border:#313a44; --border-2:#3c4753;
+    --accent:#7fb2d8; --accent-ink:#bcdcf2; --accent-bg:#1c2c38;
+    --ai:#e0685b; --ai-ink:#f2b3ab; --ai-bg:#33201d;
+    --ok:#7fc48e; --ok-bg:#1c2d20;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14181d; --surface:#1c2229; --surface-2:#232a33; --surface-3:#2b333d;
+  --ink:#e8ecf0; --ink-2:#a7b0ba; --ink-3:#7b8794;
+  --border:#313a44; --border-2:#3c4753;
+  --accent:#7fb2d8; --accent-ink:#bcdcf2; --accent-bg:#1c2c38;
+  --ai:#e0685b; --ai-ink:#f2b3ab; --ai-bg:#33201d;
+  --ok:#7fc48e; --ok-bg:#1c2d20;
+}
+*{box-sizing:border-box;}
+body{background:var(--bg); color:var(--ink); font-family:var(--font-body); line-height:1.65; margin:0; padding-inline:16px;}
+.wrap{max-width:760px; margin:0 auto; padding-block:40px 80px;}
+h1{font-family:var(--font-display); font-weight:700; font-size:clamp(28px,5vw,40px); line-height:1.15; margin:0 0 10px; text-wrap:balance;}
+h2{font-family:var(--font-display); font-weight:600; font-size:22px; margin:0 0 6px; text-wrap:balance;}
+h3{font-family:var(--font-display); font-weight:600; font-size:17px; margin:0 0 4px;}
+p{margin:0 0 12px;}
+.lede{font-size:17px; color:var(--ink-2); max-width:62ch;}
+.eyebrow{font-family:var(--font-mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3);}
+code, .mono{font-family:var(--font-mono); font-size:0.92em;}
+code{background:var(--surface-2); padding:1px 5px; border-radius:4px; border:1px solid var(--border);}
+pre{background:#0f1b27; color:#dce6ef; padding:14px 16px; border-radius:8px; overflow-x:auto; font-family:var(--font-mono); font-size:12.5px; line-height:1.55; margin:10px 0 0;}
+pre code{background:none; border:none; padding:0; color:inherit;}
+.k{color:#8fd0ff;} .s{color:#b6e3a7;} .c{color:#7b8794;}
+
+/* hero status strip */
+.status-strip{display:flex; flex-wrap:wrap; gap:10px; margin-top:22px;}
+.pill{font-family:var(--font-mono); font-size:12px; padding:5px 11px; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--ink-2);}
+.pill.hold{background:var(--ai-bg); color:var(--ai-ink); border-color:transparent; font-weight:500;}
+
+/* pipeline overview */
+.pipeline{display:flex; flex-direction:column; gap:0; margin:32px 0 8px; counter-reset:stage;}
+.stage-connector{display:flex; justify-content:center; padding:2px 0;}
+.stage-connector svg{display:block;}
+.overview-card{border:1px solid var(--border); background:var(--surface); border-radius:10px; padding:14px 18px; display:flex; align-items:center; gap:14px;}
+.overview-card .letter{font-family:var(--font-mono); font-size:12px; font-weight:500; width:26px; height:26px; flex:none; border-radius:50%; display:flex; align-items:center; justify-content:center; background:var(--surface-3); color:var(--ink-2); border:1px solid var(--border-2);}
+.overview-card .txt b{font-family:var(--font-body); font-weight:600; font-size:14.5px;}
+.overview-card .txt span{display:block; font-size:12.5px; color:var(--ink-2); margin-top:1px;}
+.overview-card.ai{border-color:var(--ai); background:var(--ai-bg);}
+.overview-card.ai .letter{background:var(--ai); color:#fff; border-color:var(--ai);}
+
+.loop-group{border:1.5px dashed var(--ai); border-radius:12px; padding:16px; margin:2px 0; background:color-mix(in srgb, var(--ai-bg) 55%, transparent);}
+.loop-label{font-family:var(--font-mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--ai-ink); margin-bottom:10px; display:flex; align-items:center; gap:6px;}
+.loop-cards{display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:10px;}
+.loop-card{background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 12px;}
+.loop-card b{font-size:13.5px;}
+.loop-card span{display:block; font-size:12px; color:var(--ink-2); margin-top:2px;}
+.loop-card.ai{border-color:var(--ai); background:var(--ai-bg);}
+.loop-back{font-family:var(--font-mono); font-size:11.5px; color:var(--ink-3); text-align:center; margin-top:10px;}
+
+/* sections */
+.section{margin-top:56px; padding-top:28px; border-top:1px solid var(--border);}
+.section .letter-big{font-family:var(--font-mono); font-size:13px; color:var(--ink-3); margin-bottom:6px;}
+.why{background:var(--accent-bg); border-left:3px solid var(--accent); border-radius:0 8px 8px 0; padding:12px 16px; margin-top:14px; font-size:14.5px;}
+.why b{color:var(--accent-ink); font-family:var(--font-mono); font-size:11px; letter-spacing:.05em; text-transform:uppercase; display:block; margin-bottom:4px;}
+.limit{background:var(--surface-2); border-left:3px solid var(--ink-3); border-radius:0 8px 8px 0; padding:12px 16px; margin-top:14px; font-size:14.5px;}
+.limit b{color:var(--ink-2); font-family:var(--font-mono); font-size:11px; letter-spacing:.05em; text-transform:uppercase; display:block; margin-bottom:4px;}
+.ai-note{background:var(--ai-bg); border-left:3px solid var(--ai); border-radius:0 8px 8px 0; padding:12px 16px; margin-top:14px; font-size:14.5px;}
+.ai-note b{color:var(--ai-ink); font-family:var(--font-mono); font-size:11px; letter-spacing:.05em; text-transform:uppercase; display:block; margin-bottom:4px;}
+
+.closing{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:22px 24px; margin-top:20px;}
+.closing ol{margin:10px 0 0; padding-left:20px;}
+.closing li{margin-bottom:8px;}
+
+.limits-list{display:flex; flex-direction:column; gap:14px; margin-top:16px;}
+.limits-list .item{border:1px solid var(--border); border-radius:10px; padding:14px 16px; background:var(--surface);}
+.limits-list .item b{font-size:14.5px;}
+.limits-list .item p{margin-top:6px; font-size:14px; color:var(--ink-2);}
+
+.foot{margin-top:60px; padding-top:16px; border-top:1px solid var(--border); font-size:12.5px; color:var(--ink-3);}
+</style>
+
+<div class="wrap">
+
+  <div class="eyebrow">lifting-anchor-agent — architecture walkthrough</div>
+  <h1>How the WC001 lifting-anchor agent actually decides</h1>
+  <p class="lede">A proof-of-concept AI agent that places lifting anchors on a precast concrete wall panel. Every safety number is computed by deterministic engineering code; the AI is confined to one bounded decision — which catalogue anchor to try next — and cannot influence the final result even if it tries to.</p>
+  <div class="status-strip">
+    <span class="pill">element: WC001</span>
+    <span class="pill">4700 × 3000 × 180 mm</span>
+    <span class="pill hold">STATUS: HOLD</span>
+    <span class="pill">reason: geometry sources disagree</span>
+  </div>
+
+  <h2 style="margin-top:44px;">The core safety chain, in one line</h2>
+  <p style="color:var(--ink-2); font-size:14.5px;">Four independent layers. None of them trusts the one before it — each is checked, not assumed.</p>
+
+  <div class="pipeline">
+    <div class="overview-card ai"><div class="letter">1</div><div class="txt"><b>Reasoner</b><span>can only return one anchor name, or give up — never a number</span></div></div>
+    <div class="stage-connector"><svg width="14" height="20"><path d="M7 0 V14 M2 10 L7 15 L12 10" fill="none" stroke="var(--ink-3)" stroke-width="1.5"/></svg></div>
+
+    <div class="overview-card"><div class="letter">2</div><div class="txt"><b>Validator</b><span>independently rejects anything illegal, before it's ever acted on</span></div></div>
+    <div class="stage-connector"><svg width="14" height="20"><path d="M7 0 V14 M2 10 L7 15 L12 10" fill="none" stroke="var(--ink-3)" stroke-width="1.5"/></svg></div>
+
+    <div class="overview-card"><div class="letter">3</div><div class="txt"><b>Engineering core</b><span>the only place any real number is ever computed</span></div></div>
+    <div class="stage-connector"><svg width="14" height="20"><path d="M7 0 V14 M2 10 L7 15 L12 10" fill="none" stroke="var(--ink-3)" stroke-width="1.5"/></svg></div>
+
+    <div class="overview-card"><div class="letter">4</div><div class="txt"><b>Invariant guard</b><span>recomputes the final status from raw facts — never from the Reasoner's opinion</span></div></div>
+  </div>
+
+  <h2 style="margin-top:52px;">The whole pipeline, top to bottom</h2>
+  <p style="color:var(--ink-2); font-size:14.5px;">Same idea, now in the context of the full run. Gray stages are fully deterministic code. The red stage is the only place an AI component can act — and even there, only one narrow decision.</p>
+
+  <div class="pipeline">
+
+    <div class="overview-card"><div class="letter">A</div><div class="txt"><b>cli.py</b><span>entry point — <code>python -m liftagent run data/wc001.json</code></span></div></div>
+    <div class="stage-connector"><svg width="14" height="20"><path d="M7 0 V14 M2 10 L7 15 L12 10" fill="none" stroke="var(--ink-3)" stroke-width="1.5"/></svg></div>
+
+    <div class="overview-card"><div class="letter">B</div><div class="txt"><b>ingest.py</b><span>JSON (+ optional IFC) → typed input, detect geometry conflicts</span></div></div>
+    <div class="stage-connector"><svg width="14" height="20"><path d="M7 0 V14 M2 10 L7 15 L12 10" fill="none" stroke="var(--ink-3)" stroke-width="1.5"/></svg></div>
+
+    <div class="overview-card"><div class="letter">C</div><div class="txt"><b>agent.py — setup</b><span>geometry resolved? turn confirmed? pick authoritative source</span></div></div>
+    <div class="stage-connector"><svg width="14" height="20"><path d="M7 0 V14 M2 10 L7 15 L12 10" fill="none" stroke="var(--ink-3)" stroke-width="1.5"/></svg></div>
+
+    <div class="loop-group">
+      <div class="loop-label">D — the agent loop (repeats per candidate anchor)</div>
+      <div class="loop-cards">
+        <div class="loop-card ai"><b>Reasoner</b><span>picks next anchor to try</span></div>
+        <div class="loop-card"><b>Validator</b><span>rejects illegal picks</span></div>
+        <div class="loop-card"><b>Evaluate candidate</b><span>the full engineering core</span></div>
+      </div>
+      <div class="loop-back">↩ if the candidate fails, loop back to Reasoner with the failure reason — up to 5 times</div>
+    </div>
+    <div class="stage-connector"><svg width="14" height="20"><path d="M7 0 V14 M2 10 L7 15 L12 10" fill="none" stroke="var(--ink-3)" stroke-width="1.5"/></svg></div>
+
+    <div class="overview-card"><div class="letter">E</div><div class="txt"><b>enforce_invariants()</b><span>recomputes ACCEPT / HOLD / REJECT from raw facts only</span></div></div>
+    <div class="stage-connector"><svg width="14" height="20"><path d="M7 0 V14 M2 10 L7 15 L12 10" fill="none" stroke="var(--ink-3)" stroke-width="1.5"/></svg></div>
+
+    <div class="overview-card"><div class="letter">F</div><div class="txt"><b>RFIs + rule_trace</b><span>builds the human-facing "what's missing" list and full audit log</span></div></div>
+    <div class="stage-connector"><svg width="14" height="20"><path d="M7 0 V14 M2 10 L7 15 L12 10" fill="none" stroke="var(--ink-3)" stroke-width="1.5"/></svg></div>
+
+    <div class="overview-card"><div class="letter">G</div><div class="txt"><b>report.py + visualize.py</b><span>writes the JSON report and the SVG elevation drawing</span></div></div>
+  </div>
+
+  <!-- ===================== SECTION A ===================== -->
+  <div class="section">
+    <div class="letter-big">A</div>
+    <h2>cli.py — where a run actually starts</h2>
+    <p>Everything begins with one command: <code>python -m liftagent run data/wc001.json</code>. <code>argparse</code> (Python's standard command-line library) reads and validates what was typed — is there a JSON path? Is <code>--reinforcement-confirmed</code> exactly <code>"true"</code> or <code>"false"</code>, not some other text? — before any of this project's own logic runs at all.</p>
+    <div class="why"><b>why it's built this way</b>Rolling a hand-written argument parser would mean re-inventing validation, help text and error messages that a decades-old standard library already gets right. The same engineering instinct shows up everywhere else in this codebase: don't hand-roll something a well-tested tool already does reliably.</div>
+  </div>
+
+  <!-- ===================== SECTION B ===================== -->
+  <div class="section">
+    <div class="letter-big">B</div>
+    <h2>ingest.py — three geometry sources, one genuine disagreement</h2>
+    <p>WC001's geometry doesn't arrive as one clean number — it arrives from up to three places, and this stage's job is to normalise each into a typed record and check whether they agree.</p>
+    <pre><code><span class="c">approval_design</span>  4700mm, 2 openings   — the design drawing (authoritative)
+<span class="c">ifc_export</span>       4300mm, 0 openings   — a typed-in summary field (a <b>claim</b>, never re-parsed)
+<span class="c">ifc_geometry</span>     ~4700mm, unknown     — the real .ifc file, <b>independently measured</b> (optional, --ifc)</code></pre>
+    <p style="margin-top:12px;"><code>ifc_export</code> and <code>ifc_geometry</code> look similar but mean different things: one is a written claim nobody verified, the other is this program actually opening the real IFC file and measuring its 3D geometry. Notably, the independently-measured value agrees with the design drawing (4700mm), not with the typed-in summary (4300mm) — evidence the summary field may itself be the stale one.</p>
+    <div class="why"><b>why the conflict matters</b><code>detect_geometry_conflict()</code> pairwise-compares every usable source's length (25mm tolerance) and, only when both sides reliably extracted them, their opening counts. Any disagreement beyond that tolerance means the system can never silently guess which number is correct — it flags a conflict and defers to a human.</div>
+  </div>
+
+  <!-- ===================== SECTION C ===================== -->
+  <div class="section">
+    <div class="letter-big">C</div>
+    <h2>agent.py — setup, before any anchor is tried</h2>
+    <p>Two hard facts get established immediately, and both can independently force a <code>HOLD</code> later: is the geometry resolved (no conflict), and is the turn method — how the panel gets physically flipped from flat to vertical, on a supporting <b>tilting table</b> or by a rougher <b>free crane</b> lift — actually confirmed? WC001's input says <code>"UNCONFIRMED"</code>.</p>
+    <div class="ai-note"><b>not a guess, either way</b>Even with the turn method unconfirmed, the system doesn't skip evaluating it — it runs <i>both</i> the gentle table case and the conservative, rougher free-crane case, so a human has real numbers for either outcome. It still can't accept a result built on an unconfirmed input, though — passing a conservative check is not the same as a human actually confirming the real plan.</div>
+  </div>
+
+  <!-- ===================== SECTION D ===================== -->
+  <div class="section">
+    <div class="letter-big">D</div>
+    <h2>The agent loop — the only place AI can act, deliberately boxed in</h2>
+    <p>For each catalogue anchor (up to 5, tried in a fixed capacity-based order), three things happen in sequence:</p>
+    <h3 style="margin-top:18px;">1. Reasoner — picks a name, nothing else</h3>
+    <p>Its return type has exactly one field, <code>anchor_type</code> — structurally, there is nowhere to put a force, a capacity, or a status. <code>MockReasoner</code> (the default, fully offline) just walks the fixed list. <code>LLMReasoner</code> (only active if <code>ANTHROPIC_API_KEY</code> is set) asks a real model, but never trusts its raw reply — <code>chosen = text if text in remaining else remaining[0]</code>.</p>
+    <h3 style="margin-top:18px;">2. Validator — a second, independent gate</h3>
+    <p>Rejects any anchor name that isn't a real catalogue entry, before it's ever acted on. An adversarial test double, <code>EvilReasoner</code>, always names a fake anchor (<code>"SUPER-ANCHOR-9000-NOT-IN-CATALOGUE"</code>) and always lies in its explanation text — proving the validator catches the fake name, and that a lie in explanation text can never reach an already-computed, <b>frozen</b> result object.</p>
+    <h3 style="margin-top:18px;">3. Evaluate candidate — the real engineering core</h3>
+    <p>Self-weight (volume × density, <i>not</i> the brief's uncited 72.6kN figure), centre of gravity (net of openings), trial placement at 20.7% of the panel length from each end (the position that minimises bending), then every check: edge distance, axis spacing, wall thickness, opening clash, capacity per handling state, reinforcement confirmation, clutch match.</p>
+    <p>If the trial position fails edge distance, axis spacing, or opening-void clash, a single bounded <b>"move in"</b> search runs — a closed-form calculation of the smallest inward shift that clears all three requirements, never a stepped search. The result is always re-verified against the real, unchanged check functions before being trusted.</p>
+    <div class="why"><b>the determinism boundary, proven</b>Two independent Reasoner implementations produce byte-identical engineering numbers. A validator rejects any invalid or hallucinated action. An explanation can lie freely and it changes nothing, because the result was already computed and frozen before the explanation was ever written. This is tested under deliberate attack, not just assumed.</div>
+  </div>
+
+  <!-- ===================== SECTION E ===================== -->
+  <div class="section">
+    <div class="letter-big">E</div>
+    <h2>enforce_invariants() — the final, independent verdict</h2>
+    <p>After the loop finishes, one function recomputes the status from raw facts only — never from anything the Reasoner said:</p>
+    <pre><code><span class="k">if</span> not geometry_resolved:      <span class="c">return HOLD, "UNRESOLVED_GEOMETRY_CONFLICT"</span>
+<span class="k">if</span> not turn_confirmed:         <span class="c">return HOLD, "TURN_METHOD_UNCONFIRMED"</span>
+<span class="k">if</span> reinforcement != PASS:      <span class="c">return HOLD, "SUPPLEMENTARY_REINFORCEMENT_UNCONFIRMED"</span>
+<span class="k">if</span> candidate_passed:          <span class="c">return ACCEPT_PROVISIONAL, None</span>
+<span class="k">if</span> candidates_exhausted:      <span class="c">return REJECT, "NO_CANDIDATE_SATISFIES_REQUIREMENTS"</span></code></pre>
+    <p style="margin-top:12px;"><code>HOLD</code> means "we don't have enough confirmed information to decide." <code>REJECT</code> means something stronger: every real option was tried, and the honest answer is none of them work. WC001 hits the very first line — the geometry conflict — so it correctly <code>HOLD</code>s, regardless of how the anchor math turns out.</p>
+  </div>
+
+  <!-- ===================== SECTION F/G ===================== -->
+  <div class="section">
+    <div class="letter-big">F · G</div>
+    <h2>RFIs, the audit trail, and the final report</h2>
+    <p>The same raw facts that drove the status also drive the human-facing "please confirm this" messages (RFIs) — both are read from one shared source of truth, so they can never contradict each other. Every intermediate calculation is separately logged into a full <code>rule_trace</code>, whether or not it ended up mattering to the final status.</p>
+    <p><code>report.py</code> turns the finished, immutable result into the structured JSON and a human-readable terminal summary; <code>visualize.py</code> draws the 2D elevation with the anchor positions. Even when the status is <code>HOLD</code>, the calculated placement still gets drawn and reported — clearly labelled "illustrative, not a resolved placement" — so a reviewing engineer isn't left with nothing to look at.</p>
+  </div>
+
+  <!-- ===================== CLOSING ===================== -->
+  <div class="section">
+    <div class="letter-big">summary</div>
+    <h2>The determinism boundary, in one place</h2>
+    <div class="closing">
+      <p>The brief's central question was: <i>where does the AI belong, and where must it never go?</i> This architecture answers it with four independent, tested layers:</p>
+      <ol>
+        <li><b>Typed action space.</b> The only thing an AI component can ever return is one anchor name or a give-up signal — never a number, by construction of the data type itself.</li>
+        <li><b>A second, independent validator.</b> Any illegal or hallucinated action is rejected before it can be acted on.</li>
+        <li><b>An invariant guard.</b> The final status is always recomputed from raw deterministic facts, and the AI's own opinion is never read.</li>
+        <li><b>Immutability.</b> Every result object is frozen the instant it's built — nothing downstream, including an explanation step, can reach back and change it.</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="letter-big">honest limitations</div>
+    <h2>What this POC doesn't do — on purpose</h2>
+    <div class="limits-list">
+      <div class="item"><b>Only one position is ever tried per anchor.</b><p>The "move in" search is a single closed-form calculation, not an optimiser. It can only ever make the system more conservative — reject a candidate or escalate to a different anchor — never accept something unsafe.</p></div>
+      <div class="item"><b>Opening trimmer/3D reinforcement clash isn't modelled.</b><p>Landing an anchor right at the mathematical edge of a void isn't necessarily ideal in practice — real trimmer reinforcement around an opening isn't checked. Documented as an explicit next step, not silently assumed fine.</p></div>
+      <div class="item"><b>The supplied WC001 IFC doesn't provide extractable opening geometry.</b><p>The file's panel is proxy-style geometry, without the semantic wall/opening entities (<code>IfcWall</code> + <code>IfcOpeningElement</code> + <code>IfcRelVoidsElement</code>) needed to deterministically recover the two approval openings. The agent reports that opening information as <code>UNKNOWN</code> rather than inferring or fabricating it, contributing to WC001's geometry conflict and <code>HOLD</code> — a separate wall-modeled IFC file was investigated and confirmed this kind of extraction is feasible when the file does carry that structure, so this is a known input-format limitation, not a fundamental one.</p></div>
+      <div class="item"><b>Self-weight is derived, not copied from the brief's figure.</b><p>The brief's own "G = 72.6kN" doesn't reconcile with any geometry + density combination given. This system computes it from first principles (volume × density) and reports the brief's figure only as an unverified reference, never as an authoritative input.</p></div>
+    </div>
+  </div>
+
+  <div class="foot">lifting-anchor-agent — WC001 technical assessment · architecture reference</div>
+
+</div>
